@@ -1,4 +1,4 @@
-/app
+#/app
 # Android / Kotlin / Gradle
 .gradle/
 build/

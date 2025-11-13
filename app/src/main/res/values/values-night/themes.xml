@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- 🌙 Tema Oscuro -->
+    <style name="Theme.RoadGuardianAuto" parent="Theme.Material3.Dark.NoActionBar">
+        <!-- Colores principales -->
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryVariant">@color/primary_variant</item>
+        <item name="colorOnPrimary">@color/on_primary</item>
+        <item name="colorSecondary">@color/secondary</item>
+        <item name="colorOnSecondary">@color/on_secondary</item>
+
+        <!-- Fondo y superficie -->
+        <item name="android:windowBackground">@color/background_dark</item>
+        <item name="colorSurface">@color/surface_dark</item>
+        <item name="colorBackground">@color/background_dark</item>
+
+        <!-- Texto -->
+        <item name="android:textColorPrimary">@color/text_white</item>
+        <item name="android:textColorSecondary">@color/text_gray</item>
+
+        <!-- Botones y acento -->
+        <item name="colorAccent">@color/primary</item>
+        <item name="android:colorButtonNormal">@color/button_background</item>
+
+        <!-- Fuente global -->
+        <item name="android:fontFamily">@font/roboto_bold</item>
+
+        <!-- Barras del sistema -->
+        <item name="android:statusBarColor">@color/background_dark</item>
+        <item name="android:navigationBarColor">@color/background_dark</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+
+        <!-- Toolbars -->
+        <item name="toolbarStyle">@style/Widget.Material3.Toolbar</item>
+    </style>
+
+</resources>

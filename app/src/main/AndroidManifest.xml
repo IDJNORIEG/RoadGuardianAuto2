@@ -1,0 +1,76 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- ðŸ”’ Permisos requeridos -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- ðŸš˜ Soporte obligatorio para Android Auto y cÃ¡mara -->
+    <uses-feature android:name="android.hardware.camera" android:required="true" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+    <uses-feature android:name="android.hardware.location" android:required="false" />
+
+    <application
+        android:allowBackup="true"
+        android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:supportsRtl="true"
+        android:usesCleartextTraffic="true"
+        android:theme="@style/Theme.RoadGuardianAuto"
+        tools:targetApi="34">
+
+        <!-- ðŸ§  Actividad principal (interfaz visual completa) -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.RoadGuardianAuto">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- ðŸš— Servicio de Android Auto / Automotive OS -->
+        <service
+            android:name=".RoadGuardianCarService"
+            android:exported="true"
+            android:foregroundServiceType="camera|location"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="androidx.car.app.CarAppService" />
+            </intent-filter>
+
+            <meta-data
+                android:name="com.google.android.gms.car.application"
+                android:resource="@xml/automotive_app_desc" />
+        </service>
+
+        <!-- ðŸ§© Fragmento de ajustes (UI flotante de configuraciÃ³n) -->
+        <activity
+            android:name=".SettingsDialogFragment"
+            android:exported="false"
+            android:theme="@style/Theme.RoadGuardianAuto.Dialog" />
+
+        <!-- ðŸ§  TensorFlow Lite optimizado -->
+        <meta-data
+            android:name="com.google.android.gms.tflite.OPTIMIZED"
+            android:value="true" />
+
+        <!-- ðŸŽ¨ Compatibilidad con el nuevo sistema de iconos -->
+        <meta-data
+            android:name="com.android.launcher3.LEGACY_ICON"
+            android:resource="@drawable/ic_launcher" />
+
+    </application>
+
+</manifest>
+
+
