@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<modelConfig>
+    <model
+        name="YOLOv8n"
+        file="yolov8n.tflite"
+        input_size="640x640"
+        input_dtype="float32"
+        framework="tflite"
+        version="8.0"
+        description="Modelo optimizado YOLOv8n para detección de fauna silvestre en carretera" />
+</modelConfig>

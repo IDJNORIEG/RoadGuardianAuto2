@@ -1,0 +1,15 @@
+E:\Projects\RoadGuardianAuto2\app\src\main\java\com\roadguardian\auto\DetectionScreen.kt
+E:\Projects\RoadGuardianAuto2\app\src\main\java\com\roadguardian\auto\models\DetectionLog.kt
+E:\Projects\RoadGuardianAuto2\app\src\main\java\com\roadguardian\auto\SettingsManager.kt
+E:\Projects\RoadGuardianAuto2\app\src\main\java\com\roadguardian\auto\RoadGuardianCarService.kt
+E:\Projects\RoadGuardianAuto2\app\src\main\java\com\roadguardian\auto\SettingsDialogFragment.kt
+E:\Projects\RoadGuardianAuto2\app\src\main\java\com\roadguardian\auto\ui\DetectionOverlayView.kt
+E:\Projects\RoadGuardianAuto2\app\src\main\java\com\roadguardian\auto\CameraManager.kt
+E:\Projects\RoadGuardianAuto2\app\src\main\java\com\roadguardian\auto\ui\ImageUtils.kt
+E:\Projects\RoadGuardianAuto2\app\src\main\java\com\roadguardian\auto\MainActivity.kt
+E:\Projects\RoadGuardianAuto2\app\src\main\java\com\roadguardian\auto\utils\ImageUtils.kt
+E:\Projects\RoadGuardianAuto2\app\src\main\java\com\roadguardian\auto\models\AnimalType.kt
+E:\Projects\RoadGuardianAuto2\app\src\main\java\com\roadguardian\auto\SettingsScreen.kt
+E:\Projects\RoadGuardianAuto2\app\src\main\java\com\roadguardian\auto\DetectionManager.kt
+E:\Projects\RoadGuardianAuto2\app\src\main\java\com\roadguardian\auto\SettingsDialog.kt
+E:\Projects\RoadGuardianAuto2\app\src\main\java\com\roadguardian\auto\models\Detection.kt

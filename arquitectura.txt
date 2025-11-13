@@ -1,0 +1,44 @@
+RoadGuardianAuto/
+├── app/
+│   ├── src/
+│   │   ├── main/
+│   │   │   ├── java/com/roadguardian/auto/
+│   │   │   │   ├── MainActivity.kt
+│   │   │   │   ├── RoadGuardianCarService.kt
+│   │   │   │   ├── DetectionManager.kt
+│   │   │   │   ├── CameraManager.kt
+│   │   │   │   ├── SettingsManager.kt
+│   │   │   │   ├── ImageUtils.kt
+│   │   │   │   ├── SettingsDialogFragment.kt
+│   │   │   │   ├── ui/
+│   │   │   │   │   ├── DetectionOverlayView.kt
+│   │   │   │   ├── models/
+│   │   │   │   │   ├── Detection.kt
+│   │   │   │   │   ├── AnimalType.kt
+│   │   │   │   │   └── DetectionLog.kt
+│   │   │   ├── res/
+│   │   │   │   ├── layout/
+│   │   │   │   │   ├── activity_main.xml
+│   │   │   │   │   ├── screen_detection.xml
+│   │   │   │   │   └── dialog_settings.xml
+│   │   │   │   ├── values/
+│   │   │   │   │   ├── colors.xml
+│   │   │   │   │   ├── strings.xml
+│   │   │   │   │   └── themes.xml
+│   │   │   │   ├── drawable/
+│   │   │   │   │   ├── ic_launcher.xml
+│   │   │   │   │   ├── ic_stop.xml
+│   │   │   │   │   └── status_background.xml
+│   │   │   │   ├── xml/
+│   │   │   │   │   └── automotive_app_desc.xml
+│   │   │   │   └── raw/
+│   │   │   │       └── alert_sound.mp3
+│   │   │   └── AndroidManifest.xml
+│   │   └── assets/
+│   │       └── yolov8n.tflite
+│   ├── build.gradle.kts
+│   ├── proguard-rules.pro
+├── build.gradle.kts
+├── settings.gradle.kts
+├── gradle.properties
+└── gradle-wrapper.properties
