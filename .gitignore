@@ -1,1 +1,11 @@
 /app
+# Android / Kotlin / Gradle
+.gradle/
+build/
+captures/
+*.apk
+*.aab
+*.iml
+local.properties
+.idea/
+.DS_Store
