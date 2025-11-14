@@ -7,6 +7,8 @@ import androidx.car.app.CarAppService
 import androidx.car.app.Session
 import androidx.car.app.Screen
 import androidx.car.app.validation.HostValidator
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import com.roadguardian.auto.models.Detection
 import com.roadguardian.auto.models.DetectionLog
 import kotlinx.coroutines.*
@@ -41,6 +43,42 @@ class RoadGuardianSession : Session() {
     private lateinit var detectionScreen: DetectionScreen
     private lateinit var detectionManager: DetectionManager
     private val detectionLog = DetectionLog()
+
+    init {
+        // Observar el ciclo de vida de la sesión
+        lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onCreate(owner: LifecycleOwner) {
+                super.onCreate(owner)
+                Log.d("RoadGuardianSession", "🟢 Sesión creada")
+            }
+
+            override fun onStart(owner: LifecycleOwner) {
+                super.onStart(owner)
+                Log.d("RoadGuardianSession", "▶️ Sesión iniciada")
+            }
+
+            override fun onResume(owner: LifecycleOwner) {
+                super.onResume(owner)
+                Log.d("RoadGuardianSession", "🔄 Sesión resumida")
+            }
+
+            override fun onPause(owner: LifecycleOwner) {
+                super.onPause(owner)
+                Log.d("RoadGuardianSession", "⏸️ Sesión pausada")
+            }
+
+            override fun onStop(owner: LifecycleOwner) {
+                super.onStop(owner)
+                Log.d("RoadGuardianSession", "⏹️ Sesión detenida")
+            }
+
+            override fun onDestroy(owner: LifecycleOwner) {
+                super.onDestroy(owner)
+                Log.w("RoadGuardianSession", "🔴 Sesión destruida")
+                cleanupResources()
+            }
+        })
+    }
 
     override fun onCreateScreen(intent: Intent): Screen {
         Log.i("RoadGuardianSession", "🚀 Inicializando pantalla principal")
@@ -90,6 +128,19 @@ class RoadGuardianSession : Session() {
         }
     }
 
+    private fun cleanupResources() {
+        try {
+            coroutineScope.cancel()
+            if (::detectionManager.isInitialized) {
+                detectionManager.release()
+            }
+            exportSessionLog()
+            Log.i("RoadGuardianSession", "✅ Recursos liberados correctamente")
+        } catch (e: Exception) {
+            Log.e("RoadGuardianSession", "❌ Error al liberar recursos: ${e.message}")
+        }
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         Log.d("RoadGuardianSession", "📱 Nuevo intent recibido")
@@ -98,13 +149,5 @@ class RoadGuardianSession : Session() {
     override fun onCarConfigurationChanged(newConfiguration: android.content.res.Configuration) {
         super.onCarConfigurationChanged(newConfiguration)
         Log.d("RoadGuardianSession", "⚙️ Configuración del vehículo cambiada")
-    }
-
-    override fun onDestroy(owner: androidx.lifecycle.LifecycleOwner) {
-        super.onDestroy(owner)
-        coroutineScope.cancel()
-        detectionManager.release()
-        exportSessionLog()
-        Log.w("RoadGuardianSession", "🔴 Sesión finalizada")
     }
 }

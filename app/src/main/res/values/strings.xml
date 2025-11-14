@@ -1,29 +1,33 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- ðŸŒ App -->
+    <!-- 🌍 App -->
     <string name="app_name">RoadGuardian Auto</string>
 
-    <!-- ðŸ”§ Interfaz principal -->
-    <string name="start_detection">Iniciar DetecciÃ³n</string>
+    <!-- 🔧 Interfaz principal -->
+    <string name="start_detection">Iniciar Detección</string>
     <string name="stop_detection">Detener</string>
-    <string name="settings">ConfiguraciÃ³n</string>
+    <string name="settings">Configuración</string>
     <string name="sensitivity">Sensibilidad</string>
-    <string name="confidence">Confianza mÃ­nima</string>
+    <string name="confidence">Confianza mínima</string>
     <string name="sound_alert">Alerta sonora</string>
     <string name="theme_mode">Modo oscuro</string>
     <string name="language">Idioma</string>
     <string name="status_ready">Listo</string>
     <string name="status_detecting">Detectando...</string>
-    <string name="alert_animal">Â¡ALERTA! Animal en la vÃ­a</string>
+    <string name="alert_animal">¡ALERTA! Animal en la vía</string>
     <string name="distance">Distancia</string>
     <string name="reduce_speed">REDUZCA VELOCIDAD</string>
     <string name="detections_count">Detecciones</string>
     <string name="view_log">Ver registro</string>
     <string name="export_log">Exportar</string>
     <string name="no_detections">No hay detecciones</string>
-    <string name="camera_permission_required">Se requiere permiso de cÃ¡mara</string>
+    <string name="camera_permission_required">Se requiere permiso de cámara</string>
+    <string name="close_settings">Cerrar</string>
+    <string name="light_mode">Modo claro</string>
+    <string name="dark_mode">Modo oscuro</string>
+    <string name="toggle_theme">Cambiar tema</string>
 
-    <!-- ðŸ¾ Animales -->
+    <!-- 🐾 Animales -->
     <string name="animal_bird">Ave</string>
     <string name="animal_cat">Gato</string>
     <string name="animal_dog">Perro</string>
@@ -33,58 +37,5 @@
     <string name="animal_bear">Oso</string>
     <string name="animal_zebra">Cebra</string>
     <string name="animal_giraffe">Jirafa</string>
-
-    <!-- ðŸŒ Traducciones multilanguage -->
-    <!-- English -->
-    <string name="en_start_detection">Start Detection</string>
-    <string name="en_stop_detection">Stop</string>
-    <string name="en_settings">Settings</string>
-    <string name="en_status_ready">Ready</string>
-    <string name="en_status_detecting">Detecting...</string>
-    <string name="en_alert_animal">ALERT! Animal on the road</string>
-    <string name="en_reduce_speed">SLOW DOWN</string>
-
-    <!-- Italiano -->
-    <string name="it_start_detection">Avvia Rilevamento</string>
-    <string name="it_stop_detection">Ferma</string>
-    <string name="it_settings">Impostazioni</string>
-    <string name="it_status_ready">Pronto</string>
-    <string name="it_status_detecting">Rilevamento...</string>
-    <string name="it_alert_animal">ALLERTA! Animale sulla strada</string>
-    <string name="it_reduce_speed">RIDURRE VELOCITÃ€</string>
-
-    <!-- FranÃ§ais -->
-    <string name="fr_start_detection">DÃ©marrer la dÃ©tection</string>
-    <string name="fr_stop_detection">ArrÃªter</string>
-    <string name="fr_settings">ParamÃ¨tres</string>
-    <string name="fr_status_ready">PrÃªt</string>
-    <string name="fr_status_detecting">DÃ©tection...</string>
-    <string name="fr_alert_animal">ALERTE! Animal sur la route</string>
-    <string name="fr_reduce_speed">RALENTISSEZ</string>
-
-    <!-- Deutsch -->
-    <string name="de_start_detection">Erkennung starten</string>
-    <string name="de_stop_detection">Stopp</string>
-    <string name="de_settings">Einstellungen</string>
-    <string name="de_status_ready">Bereit</string>
-    <string name="de_status_detecting">Erkennung...</string>
-    <string name="de_alert_animal">WARNUNG! Tier auf der StraÃŸe</string>
-    <string name="de_reduce_speed">GESCHWINDIGKEIT REDUZIEREN</string>
-
-    <!-- Ð ÑƒÑÑÐºÐ¸Ð¹ -->
-    <string name="ru_start_detection">ÐÐ°Ñ‡Ð°Ñ‚ÑŒ Ð¾Ð±Ð½Ð°Ñ€ÑƒÐ¶ÐµÐ½Ð¸Ðµ</string>
-    <string name="ru_stop_detection">ÐžÑÑ‚Ð°Ð½Ð¾Ð²Ð¸Ñ‚ÑŒ</string>
-    <string name="ru_settings">ÐÐ°ÑÑ‚Ñ€Ð¾Ð¹ÐºÐ¸</string>
-    <string name="ru_status_ready">Ð“Ð¾Ñ‚Ð¾Ð²Ð¾</string>
-    <string name="ru_status_detecting">ÐžÐ±Ð½Ð°Ñ€ÑƒÐ¶ÐµÐ½Ð¸Ðµ...</string>
-    <string name="ru_alert_animal">Ð’ÐÐ˜ÐœÐÐÐ˜Ð•! Ð–Ð¸Ð²Ð¾Ñ‚Ð½Ð¾Ðµ Ð½Ð° Ð´Ð¾Ñ€Ð¾Ð³Ðµ</string>
-    <string name="ru_reduce_speed">Ð¡ÐÐ˜Ð—Ð˜Ð¢Ð• Ð¡ÐšÐžÐ ÐžÐ¡Ð¢Ð¬</string>
-    <string name="toggle_theme">Cambiar tema</string>
-
-    <!-- faltantes -->
-    <string name="close_settings">Cerrar configuración</string>
-    <string name="light_mode">Modo claro</string>
-    <string name="dark_mode">Modo oscuro</string>
-
+    <string name="animal_elephant">Elefante</string>
 </resources>
-

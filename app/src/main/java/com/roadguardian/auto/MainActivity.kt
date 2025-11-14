@@ -34,8 +34,14 @@ class MainActivity : AppCompatActivity() {
     private var currentLanguage = "es"
     private var detecting = false
 
+    companion object {
+        private const val TAG = "MainActivity"
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        Log.i(TAG, "🚀 Iniciando MainActivity")
         
         // Aplicar tema según preferencias
         val isDarkMode = getSharedPreferences("theme_prefs", MODE_PRIVATE)
@@ -48,12 +54,18 @@ class MainActivity : AppCompatActivity() {
         initializeManagers()
         setupListeners()
         
-        mediaPlayer = MediaPlayer.create(this, R.raw.alert_sound)
+        try {
+            mediaPlayer = MediaPlayer.create(this, R.raw.alert_sound)
+            Log.d(TAG, "🔊 MediaPlayer inicializado")
+        } catch (e: Exception) {
+            Log.e(TAG, "⚠️ No se pudo cargar sonido de alerta: ${e.message}")
+        }
 
         // Cargar idioma desde DataStore
         lifecycleScope.launch {
             settingsManager.settingsFlow.collect { settings ->
                 currentLanguage = settings.language
+                Log.d(TAG, "🌍 Idioma actualizado: $currentLanguage")
             }
         }
 
@@ -62,39 +74,48 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun initializeViews() {
-        previewView = findViewById(R.id.previewView)
-        overlayView = findViewById(R.id.detectionOverlay)
-        counterText = findViewById(R.id.counterText)
-        statusText = findViewById(R.id.statusText)
-        startButton = findViewById(R.id.startButton)
-        settingsButton = findViewById(R.id.settingsButton)
+        try {
+            previewView = findViewById(R.id.previewView)
+            overlayView = findViewById(R.id.detectionOverlay)
+            counterText = findViewById(R.id.counterText)
+            statusText = findViewById(R.id.statusText)
+            startButton = findViewById(R.id.startButton)
+            settingsButton = findViewById(R.id.settingsButton)
+            
+            Log.d(TAG, "✅ Vistas inicializadas")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error inicializando vistas: ${e.message}", e)
+        }
     }
 
     private fun initializeManagers() {
-        detectionManager = DetectionManager(this)
-        settingsManager = SettingsManager(this)
-        
-        cameraManager = CameraManager(
-            context = this,
-            lifecycleOwner = this,
-            previewView = previewView,
-            overlayView = overlayView,
-            detectionManager = detectionManager,
-            currentLanguageProvider = { currentLanguage },
-            onDetectionsUpdate = { detections ->
-                runOnUiThread {
-                    if (detections.isNotEmpty()) {
-                        totalDetections += detections.size
-                        counterText.text = totalDetections.toString()
-                        playAlert()
+        try {
+            detectionManager = DetectionManager(this)
+            settingsManager = SettingsManager(this)
+            
+            cameraManager = CameraManager(
+                context = this,
+                lifecycleOwner = this,
+                previewView = previewView,
+                overlayView = overlayView,
+                detectionManager = detectionManager,
+                currentLanguageProvider = { currentLanguage },
+                onDetectionsUpdate = { detections ->
+                    runOnUiThread {
+                        updateDetectionUI(detections)
                     }
                 }
-            }
-        )
+            )
+            
+            Log.d(TAG, "✅ Managers inicializados")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error inicializando managers: ${e.message}", e)
+        }
     }
 
     private fun setupListeners() {
         startButton.setOnClickListener {
+            Log.d(TAG, "🔘 Botón presionado: detecting=$detecting")
             if (!detecting) {
                 startDetection()
             } else {
@@ -103,6 +124,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         settingsButton.setOnClickListener {
+            Log.d(TAG, "⚙️ Abriendo configuración")
             showSettingsDialog()
         }
     }
@@ -110,9 +132,10 @@ class MainActivity : AppCompatActivity() {
     private fun checkCameraPermission() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
             == PackageManager.PERMISSION_GRANTED) {
-            // Permiso ya otorgado, no iniciar automáticamente
             statusText.text = getString(R.string.status_ready)
+            Log.i(TAG, "✅ Permiso de cámara ya otorgado")
         } else {
+            Log.w(TAG, "⚠️ Solicitando permiso de cámara")
             requestPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
@@ -121,8 +144,10 @@ class MainActivity : AppCompatActivity() {
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
             if (isGranted) {
                 statusText.text = getString(R.string.status_ready)
+                Log.i(TAG, "✅ Permiso de cámara otorgado")
             } else {
                 statusText.text = getString(R.string.camera_permission_required)
+                Log.e(TAG, "❌ Permiso de cámara denegado")
             }
         }
 
@@ -130,36 +155,77 @@ class MainActivity : AppCompatActivity() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
             != PackageManager.PERMISSION_GRANTED) {
             statusText.text = getString(R.string.camera_permission_required)
+            Log.e(TAG, "❌ No hay permiso de cámara")
             return
         }
         
-        cameraManager.initializeCamera()
-        detecting = true
-        statusText.text = getString(R.string.status_detecting)
-        startButton.text = getString(R.string.stop_detection)
+        Log.i(TAG, "▶️ Iniciando detección")
+        
+        try {
+            cameraManager.initializeCamera()
+            detecting = true
+            statusText.text = getString(R.string.status_detecting)
+            startButton.text = getString(R.string.stop_detection)
+            totalDetections = 0
+            counterText.text = "0"
+            
+            Log.i(TAG, "✅ Detección iniciada correctamente")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error iniciando detección: ${e.message}", e)
+            statusText.text = "Error: ${e.message}"
+        }
     }
 
     private fun stopDetection() {
-        cameraManager.stopCamera()
-        detecting = false
-        statusText.text = getString(R.string.status_ready)
-        startButton.text = getString(R.string.start_detection)
-        overlayView.clearDetections()
-        totalDetections = 0
-        counterText.text = "0"
+        Log.i(TAG, "⏹️ Deteniendo detección")
+        
+        try {
+            cameraManager.stopCamera()
+            detecting = false
+            statusText.text = getString(R.string.status_ready)
+            startButton.text = getString(R.string.start_detection)
+            overlayView.clearDetections()
+            totalDetections = 0
+            counterText.text = "0"
+            
+            Log.i(TAG, "✅ Detección detenida correctamente")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error deteniendo detección: ${e.message}", e)
+        }
+    }
+
+    private fun updateDetectionUI(detections: List<Detection>) {
+        if (detections.isNotEmpty()) {
+            totalDetections += detections.size
+            counterText.text = totalDetections.toString()
+            
+            Log.i(TAG, "📊 Total detecciones: $totalDetections")
+            
+            playAlert()
+        }
     }
 
     private fun showSettingsDialog() {
-        val dialog = SettingsDialogFragment()
-        dialog.show(supportFragmentManager, "SettingsDialog")
+        try {
+            val dialog = SettingsDialogFragment()
+            dialog.show(supportFragmentManager, "SettingsDialog")
+            Log.d(TAG, "✅ Diálogo de configuración mostrado")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error mostrando diálogo: ${e.message}", e)
+        }
     }
 
     private fun playAlert() {
         lifecycleScope.launch {
-            settingsManager.settingsFlow.collect { settings ->
-                if (settings.soundEnabled && mediaPlayer?.isPlaying == false) {
-                    mediaPlayer?.start()
+            try {
+                settingsManager.settingsFlow.collect { settings ->
+                    if (settings.soundEnabled && mediaPlayer?.isPlaying == false) {
+                        mediaPlayer?.start()
+                        Log.d(TAG, "🔊 Reproduciendo alerta sonora")
+                    }
                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error reproduciendo alerta: ${e.message}")
             }
         }
     }
@@ -167,22 +233,31 @@ class MainActivity : AppCompatActivity() {
     fun applyTheme(darkMode: Boolean) {
         if (darkMode) {
             setTheme(R.style.Theme_RoadGuardianAuto_Dark)
+            Log.d(TAG, "🌙 Tema oscuro aplicado")
         } else {
             setTheme(R.style.Theme_RoadGuardianAuto)
+            Log.d(TAG, "☀️ Tema claro aplicado")
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        mediaPlayer?.release()
-        detectionManager.release()
-        if (detecting) {
-            cameraManager.stopCamera()
+        Log.w(TAG, "🔴 Destruyendo MainActivity")
+        
+        try {
+            mediaPlayer?.release()
+            detectionManager.release()
+            if (detecting) {
+                cameraManager.stopCamera()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error en onDestroy: ${e.message}")
         }
     }
 
     override fun onPause() {
         super.onPause()
+        Log.d(TAG, "⏸️ MainActivity pausada")
         if (detecting) {
             cameraManager.stopCamera()
         }
@@ -190,6 +265,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        Log.d(TAG, "▶️ MainActivity resumida")
         if (detecting) {
             cameraManager.initializeCamera()
         }
