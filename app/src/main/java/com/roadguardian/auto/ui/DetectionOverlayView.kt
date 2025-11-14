@@ -10,27 +10,38 @@ import java.util.concurrent.CopyOnWriteArrayList
 
 class DetectionOverlayView @JvmOverloads constructor(
     context: Context,
-    attrs: AttributeSet? = null
-) : View(context, attrs) {
+    attrs: AttributeSet? = null,
+    defStyleAttr: Int = 0
+) : View(context, attrs, defStyleAttr) {
 
     private val detections = CopyOnWriteArrayList<Detection>()
+    private var currentLanguage = "es"
+
     private val boxPaint = Paint().apply {
         color = context.getColor(R.color.green_accent)
         style = Paint.Style.STROKE
-        strokeWidth = 5f
+        strokeWidth = 6f
         isAntiAlias = true
     }
 
     private val textPaint = Paint().apply {
         color = Color.WHITE
-        textSize = 36f
+        textSize = 42f
         typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        isAntiAlias = true
+        setShadowLayer(4f, 2f, 2f, Color.BLACK)
+    }
+
+    private val backgroundPaint = Paint().apply {
+        color = Color.argb(180, 0, 0, 0)
+        style = Paint.Style.FILL
         isAntiAlias = true
     }
 
     fun updateDetections(newDetections: List<Detection>, language: String) {
         detections.clear()
         detections.addAll(newDetections)
+        currentLanguage = language
         invalidate()
     }
 
@@ -44,24 +55,43 @@ class DetectionOverlayView @JvmOverloads constructor(
         viewWidth: Int,
         viewHeight: Int
     ): List<Detection> {
-        return detections.map {
-            it.copy() // En este caso, si tuvieras coordenadas, las escalarías aquí
-        }
+        // En caso de tener coordenadas reales del modelo, se escalarían aquí
+        return detections
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
+        
+        if (detections.isEmpty()) return
+
+        var yOffset = 100f
+        val padding = 20f
+
         for (detection in detections) {
-            // Simulación: rectángulo central
-            val left = width * 0.3f
-            val top = height * 0.3f
-            val right = width * 0.7f
-            val bottom = height * 0.7f
-
-            canvas.drawRect(left, top, right, bottom, boxPaint)
-
-            val label = "${detection.animal.displayName} (${detection.getConfidencePercentage()}%)"
-            canvas.drawText(label, left + 10, top - 10, textPaint)
+            val animalName = detection.animal.getLocalizedName(currentLanguage)
+            val label = "$animalName (${detection.getConfidencePercentage()}%) - ${detection.distance}m"
+            
+            val textBounds = Rect()
+            textPaint.getTextBounds(label, 0, label.length, textBounds)
+            
+            val rectLeft = padding
+            val rectTop = yOffset - textBounds.height() - padding
+            val rectRight = textBounds.width() + (padding * 3)
+            val rectBottom = yOffset + padding
+            
+            canvas.drawRoundRect(
+                rectLeft,
+                rectTop,
+                rectRight,
+                rectBottom,
+                15f,
+                15f,
+                backgroundPaint
+            )
+            
+            canvas.drawText(label, padding * 2, yOffset, textPaint)
+            
+            yOffset += textBounds.height() + (padding * 3)
         }
     }
 }

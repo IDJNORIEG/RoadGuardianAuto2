@@ -5,32 +5,27 @@ import android.content.pm.PackageManager
 import android.media.MediaPlayer
 import android.os.Bundle
 import android.util.Log
-import android.view.View
+import android.widget.Button
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.ImageAnalysis
-import androidx.camera.core.ImageProxy
-import androidx.camera.core.Preview
-import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
-import com.google.android.material.floatingactionbutton.FloatingActionButton
-import com.google.android.material.textview.MaterialTextView
+import androidx.lifecycle.lifecycleScope
 import com.roadguardian.auto.models.Detection
 import com.roadguardian.auto.ui.DetectionOverlayView
-import kotlinx.coroutines.*
-import java.util.concurrent.Executors
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var previewView: PreviewView
     private lateinit var overlayView: DetectionOverlayView
     private lateinit var counterText: TextView
-    private lateinit var statusText: MaterialTextView
-    private lateinit var stopButton: FloatingActionButton
+    private lateinit var statusText: TextView
+    private lateinit var startButton: Button
+    private lateinit var settingsButton: Button
 
+    private lateinit var cameraManager: CameraManager
     private lateinit var detectionManager: DetectionManager
     private lateinit var settingsManager: SettingsManager
 
@@ -39,119 +34,164 @@ class MainActivity : AppCompatActivity() {
     private var currentLanguage = "es"
     private var detecting = false
 
-    private val cameraExecutor = Executors.newSingleThreadExecutor()
-    private val mainScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.screen_detection)
+        
+        // Aplicar tema según preferencias
+        val isDarkMode = getSharedPreferences("theme_prefs", MODE_PRIVATE)
+            .getBoolean("dark_mode", false)
+        applyTheme(isDarkMode)
+        
+        setContentView(R.layout.activity_main)
 
-        previewView = findViewById(R.id.detectionPreview)
-        overlayView = findViewById(R.id.detectionOverlay)
-        counterText = findViewById(R.id.detectionCountText)
-        statusText = findViewById(R.id.statusTextDetection)
-        stopButton = findViewById(R.id.stopButton)
-
-        detectionManager = DetectionManager(this)
-        settingsManager = SettingsManager(this)
-
+        initializeViews()
+        initializeManagers()
+        setupListeners()
+        
         mediaPlayer = MediaPlayer.create(this, R.raw.alert_sound)
 
-        stopButton.setOnClickListener { stopDetection() }
-
-        // Verificar permisos de cámara
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
-            == PackageManager.PERMISSION_GRANTED) {
-            startCamera()
-        } else {
-            requestPermissionLauncher.launch(Manifest.permission.CAMERA)
+        // Cargar idioma desde DataStore
+        lifecycleScope.launch {
+            settingsManager.settingsFlow.collect { settings ->
+                currentLanguage = settings.language
+            }
         }
 
-        // Cargar idioma desde DataStore
-        mainScope.launch {
-            settingsManager.settingsFlow.collect {
-                currentLanguage = it.language
+        // Verificar permisos de cámara
+        checkCameraPermission()
+    }
+
+    private fun initializeViews() {
+        previewView = findViewById(R.id.previewView)
+        overlayView = findViewById(R.id.detectionOverlay)
+        counterText = findViewById(R.id.counterText)
+        statusText = findViewById(R.id.statusText)
+        startButton = findViewById(R.id.startButton)
+        settingsButton = findViewById(R.id.settingsButton)
+    }
+
+    private fun initializeManagers() {
+        detectionManager = DetectionManager(this)
+        settingsManager = SettingsManager(this)
+        
+        cameraManager = CameraManager(
+            context = this,
+            lifecycleOwner = this,
+            previewView = previewView,
+            overlayView = overlayView,
+            detectionManager = detectionManager,
+            currentLanguageProvider = { currentLanguage },
+            onDetectionsUpdate = { detections ->
+                runOnUiThread {
+                    if (detections.isNotEmpty()) {
+                        totalDetections += detections.size
+                        counterText.text = totalDetections.toString()
+                        playAlert()
+                    }
+                }
             }
+        )
+    }
+
+    private fun setupListeners() {
+        startButton.setOnClickListener {
+            if (!detecting) {
+                startDetection()
+            } else {
+                stopDetection()
+            }
+        }
+
+        settingsButton.setOnClickListener {
+            showSettingsDialog()
+        }
+    }
+
+    private fun checkCameraPermission() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+            == PackageManager.PERMISSION_GRANTED) {
+            // Permiso ya otorgado, no iniciar automáticamente
+            statusText.text = getString(R.string.status_ready)
+        } else {
+            requestPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
 
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
-            if (isGranted) startCamera()
-            else statusText.text = getString(R.string.camera_permission_required)
+            if (isGranted) {
+                statusText.text = getString(R.string.status_ready)
+            } else {
+                statusText.text = getString(R.string.camera_permission_required)
+            }
         }
 
-    private fun startCamera() {
-        val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
-        cameraProviderFuture.addListener({
-            val cameraProvider = cameraProviderFuture.get()
-
-            val preview = Preview.Builder().build().also {
-                it.setSurfaceProvider(previewView.surfaceProvider)
-            }
-
-            val imageAnalyzer = ImageAnalysis.Builder()
-                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                .build()
-                .also {
-                    it.setAnalyzer(cameraExecutor) { image ->
-                        processImage(image)
-                    }
-                }
-
-            try {
-                cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(
-                    this, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageAnalyzer
-                )
-                statusText.text = getString(R.string.status_detecting)
-                detecting = true
-            } catch (e: Exception) {
-                Log.e("MainActivity", "Error iniciando cámara: ${e.message}", e)
-            }
-
-        }, ContextCompat.getMainExecutor(this))
-    }
-
-    private fun processImage(image: ImageProxy) {
-        val bitmap = ImageUtils.imageToBitmap(image) ?: return
-        val detections = detectionManager.detectAnimals(bitmap)
-        image.close()
-
-        runOnUiThread {
-            if (detections.isNotEmpty()) {
-                totalDetections += detections.size
-                counterText.text = totalDetections.toString()
-                playAlert()
-            }
-
-            // Escalado y actualización de overlay
-            val scaledDetections = overlayView.scaleDetections(
-                detections, previewView.width, previewView.height
-            )
-            overlayView.updateDetections(scaledDetections, currentLanguage)
+    private fun startDetection() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+            != PackageManager.PERMISSION_GRANTED) {
+            statusText.text = getString(R.string.camera_permission_required)
+            return
         }
-    }
-
-    private fun playAlert() {
-        if (mediaPlayer?.isPlaying == false) {
-            mediaPlayer?.start()
-        }
+        
+        cameraManager.initializeCamera()
+        detecting = true
+        statusText.text = getString(R.string.status_detecting)
+        startButton.text = getString(R.string.stop_detection)
     }
 
     private fun stopDetection() {
+        cameraManager.stopCamera()
         detecting = false
         statusText.text = getString(R.string.status_ready)
+        startButton.text = getString(R.string.start_detection)
         overlayView.clearDetections()
         totalDetections = 0
         counterText.text = "0"
+    }
+
+    private fun showSettingsDialog() {
+        val dialog = SettingsDialogFragment()
+        dialog.show(supportFragmentManager, "SettingsDialog")
+    }
+
+    private fun playAlert() {
+        lifecycleScope.launch {
+            settingsManager.settingsFlow.collect { settings ->
+                if (settings.soundEnabled && mediaPlayer?.isPlaying == false) {
+                    mediaPlayer?.start()
+                }
+            }
+        }
+    }
+
+    fun applyTheme(darkMode: Boolean) {
+        if (darkMode) {
+            setTheme(R.style.Theme_RoadGuardianAuto_Dark)
+        } else {
+            setTheme(R.style.Theme_RoadGuardianAuto)
+        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
         mediaPlayer?.release()
         detectionManager.release()
-        cameraExecutor.shutdown()
-        mainScope.cancel()
+        if (detecting) {
+            cameraManager.stopCamera()
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        if (detecting) {
+            cameraManager.stopCamera()
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (detecting) {
+            cameraManager.initializeCamera()
+        }
     }
 }

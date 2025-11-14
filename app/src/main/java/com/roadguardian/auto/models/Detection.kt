@@ -2,19 +2,17 @@ package com.roadguardian.auto.models
 
 import android.graphics.RectF
 
-enum class AnimalType(val displayName: String) {
-    DOG("Perro"),
-    CAT("Gato"),
-    COW("Vaca"),
-    HORSE("Caballo"),
-    UNKNOWN("Desconocido")
-}
-
+/**
+ * Representa una detección de animal con toda su información
+ */
 data class Detection(
     val animal: AnimalType,
     val confidence: Float,
-    val boundingBox: RectF,
-    val distance: Float
+    val distance: Int = 0,
+    val boundingBox: RectF = RectF(),
+    val timestamp: Long = System.currentTimeMillis()
 ) {
     fun getConfidencePercentage(): Int = (confidence * 100).toInt()
+    
+    fun getDistanceInMeters(): String = "${distance}m"
 }

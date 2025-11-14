@@ -5,9 +5,7 @@ import androidx.car.app.CarContext
 import androidx.car.app.model.*
 import androidx.lifecycle.lifecycleScope
 import com.roadguardian.auto.models.Detection
-import com.roadguardian.auto.models.AnimalType
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.collect
 import java.util.*
 
 class DetectionScreen(carContext: CarContext) : Screen(carContext) {
@@ -29,14 +27,14 @@ class DetectionScreen(carContext: CarContext) : Screen(carContext) {
         }
 
         val alertText = lastDetection?.let {
-            "${carContext.getString(R.string.alert_animal)}: ${it.animal.displayName} (${it.getConfidencePercentage()}%)"
+            "${carContext.getString(R.string.alert_animal)}: ${it.animal.getLocalizedName(currentLanguage)} (${it.getConfidencePercentage()}%)"
         } ?: carContext.getString(R.string.status_detecting)
 
         val listBuilder = ItemList.Builder().apply {
             addItem(
                 Row.Builder()
                     .setTitle("${carContext.getString(R.string.detections_count)}: $detectionCount")
-                    .setImage(CarIcon.APP_ICON)
+                    .setBrowsable(false)
                     .build()
             )
 
@@ -45,30 +43,30 @@ class DetectionScreen(carContext: CarContext) : Screen(carContext) {
                     Row.Builder()
                         .setTitle("${carContext.getString(R.string.distance)}: ${detection.distance} m")
                         .addText("${carContext.getString(R.string.reduce_speed)} ⚠️")
+                        .setBrowsable(false)
                         .build()
                 )
             }
         }
 
-        val templateBuilder = PaneTemplate.Builder(
+        return PaneTemplate.Builder(
             Pane.Builder()
                 .addRow(Row.Builder().setTitle(alertText).build())
                 .build()
         )
-
-        templateBuilder.setHeaderAction(Action.APP_ICON)
-        templateBuilder.setTitle(title)
-        templateBuilder.setActionStrip(
-            ActionStrip.Builder()
-                .addAction(
-                    Action.Builder()
-                        .setTitle(carContext.getString(R.string.stop_detection))
-                        .setOnClickListener { finish() }
-                        .build()
-                )
-                .build()
-        )
-        return templateBuilder.build()
+            .setHeaderAction(Action.APP_ICON)
+            .setTitle(title)
+            .setActionStrip(
+                ActionStrip.Builder()
+                    .addAction(
+                        Action.Builder()
+                            .setTitle(carContext.getString(R.string.stop_detection))
+                            .setOnClickListener { finish() }
+                            .build()
+                    )
+                    .build()
+            )
+            .build()
     }
 
     fun updateDetection(detection: Detection) {

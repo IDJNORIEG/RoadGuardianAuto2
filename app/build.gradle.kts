@@ -30,10 +30,8 @@ android {
         }
     }
 
-    // Habilitar compatibilidad con ViewBinding y DataBinding
     buildFeatures {
         viewBinding = true
-        dataBinding = false
     }
 
     compileOptions {
@@ -60,14 +58,13 @@ android {
 dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")
-    implementation("com.google.android.material:material:1.10.0")
-
+    implementation("com.google.android.material:material:1.11.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.activity:activity-ktx:1.8.2")
     implementation("androidx.fragment:fragment-ktx:1.6.2")
 
-    // ✅ CameraX completo
+    // CameraX
     val cameraxVersion = "1.3.1"
     implementation("androidx.camera:camera-core:$cameraxVersion")
     implementation("androidx.camera:camera-camera2:$cameraxVersion")
@@ -75,20 +72,19 @@ dependencies {
     implementation("androidx.camera:camera-view:$cameraxVersion")
     implementation("androidx.camera:camera-extensions:$cameraxVersion")
     
-    // ✅ Guava (para ListenableFuture)
+    // Guava
     implementation("com.google.guava:guava:32.1.3-android")
     
-    // âœ… Android Auto
-    implementation("androidx.car.app:app:1.7.0-beta01")
+    // Android Auto
+    implementation("androidx.car.app:app:1.4.0-rc01")
 
-    // âœ… TensorFlow Lite - conjunto limpio y compatible
+    // TensorFlow Lite
     implementation("org.tensorflow:tensorflow-lite:2.14.0")
     implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
 
-    // âœ… Kotlin Coroutines
+    // Kotlin Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
-    // âœ… DataStore para configuraciones
+    // DataStore
     implementation("androidx.datastore:datastore-preferences:1.0.0")
 }
-

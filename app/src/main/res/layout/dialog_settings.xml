@@ -9,23 +9,122 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
 
+        <!-- Sensibilidad -->
         <TextView
-            android:text="Configuración"
+            android:text="@string/sensitivity"
             android:textStyle="bold"
-            android:textSize="20sp"
-            android:layout_marginBottom="16dp" />
+            android:textSize="16sp"
+            android:layout_marginTop="8dp"/>
 
-        <Switch
-            android:id="@+id/themeSwitch"
-            android:text="Modo oscuro" />
+        <LinearLayout
+            android:orientation="horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical">
 
-        <SeekBar
-            android:id="@+id/sensitivitySeek"
-            android:max="100" />
+            <SeekBar
+                android:id="@+id/sensitivitySeek"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:max="100"
+                android:progress="50"/>
 
-        <SeekBar
-            android:id="@+id/confidenceSeek"
-            android:max="100" />
+            <TextView
+                android:id="@+id/sensitivityValue"
+                android:layout_width="60dp"
+                android:layout_height="wrap_content"
+                android:text="50%"
+                android:textAlignment="textEnd"
+                android:textSize="14sp"/>
+        </LinearLayout>
+
+        <!-- Confianza -->
+        <TextView
+            android:text="@string/confidence"
+            android:textStyle="bold"
+            android:textSize="16sp"
+            android:layout_marginTop="16dp"/>
+
+        <LinearLayout
+            android:orientation="horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical">
+
+            <SeekBar
+                android:id="@+id/confidenceSeek"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:max="100"
+                android:progress="50"/>
+
+            <TextView
+                android:id="@+id/confidenceValue"
+                android:layout_width="60dp"
+                android:layout_height="wrap_content"
+                android:text="50%"
+                android:textAlignment="textEnd"
+                android:textSize="14sp"/>
+        </LinearLayout>
+
+        <!-- Sonido -->
+        <LinearLayout
+            android:orientation="horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:text="@string/sound_alert"
+                android:textStyle="bold"
+                android:textSize="16sp"
+                android:layout_width="0dp"
+                android:layout_weight="1"/>
+
+            <Switch
+                android:id="@+id/soundSwitch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true"/>
+        </LinearLayout>
+
+        <!-- Tema -->
+        <LinearLayout
+            android:orientation="horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:text="@string/theme_mode"
+                android:textStyle="bold"
+                android:textSize="16sp"
+                android:layout_width="0dp"
+                android:layout_weight="1"/>
+
+            <Switch
+                android:id="@+id/themeSwitch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="false"/>
+        </LinearLayout>
+
+        <!-- Idioma -->
+        <TextView
+            android:text="@string/language"
+            android:textStyle="bold"
+            android:textSize="16sp"
+            android:layout_marginTop="16dp"/>
+
+        <Spinner
+            android:id="@+id/languageSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"/>
 
     </LinearLayout>
 </ScrollView>
