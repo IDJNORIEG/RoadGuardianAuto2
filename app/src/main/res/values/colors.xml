@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Colores principales -->
     <color name="primary">#2E7D32</color>
@@ -7,18 +8,27 @@
     <color name="green_accent">#66BB6A</color>
     <color name="alert_red">#FF5722</color>
 
-    <!-- Fondos -->
+    <!-- Fondos modo claro -->
     <color name="background_light">#FFFFFF</color>
     <color name="surface_light">#F5F5F5</color>
+
+    <!-- Fondos modo oscuro -->
     <color name="background_dark">#121212</color>
     <color name="surface_dark">#1E1E1E</color>
 
-    <!-- Texto -->
+    <!-- Texto modo claro -->
     <color name="text_primary_light">#212121</color>
     <color name="text_secondary_light">#757575</color>
+
+    <!-- Texto modo oscuro -->
     <color name="text_white">#FFFFFF</color>
     <color name="text_gray">#BDBDBD</color>
 
     <!-- Botones -->
     <color name="button_background">#2E7D32</color>
+
+    <!-- Colores para compatibilidad -->
+    <color name="on_primary">#FFFFFF</color>
+    <color name="secondary">#4CAF50</color>
+    <color name="on_secondary">#FFFFFF</color>
 </resources>

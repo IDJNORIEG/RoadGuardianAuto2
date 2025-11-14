@@ -1,114 +1,145 @@
 ﻿package com.roadguardian.auto
 
+import android.app.AlertDialog
 import android.app.Dialog
 import android.content.Context
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
+import android.view.View
 import android.widget.*
 import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.lifecycleScope
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class SettingsDialogFragment : DialogFragment() {
 
     private lateinit var settingsManager: SettingsManager
-    private var sensitivitySeek: SeekBar? = null
-    private var confidenceSeek: SeekBar? = null
-    private var soundSwitch: Switch? = null
-    private var themeSwitch: Switch? = null
-    private var languageSpinner: Spinner? = null
-    private var sensitivityLabel: TextView? = null
-    private var confidenceLabel: TextView? = null
-
+    
     companion object {
         private const val TAG = "SettingsDialog"
     }
 
-    override fun onAttach(context: Context) {
-        super.onAttach(context)
-        settingsManager = SettingsManager(context)
-        Log.d(TAG, "✅ SettingsDialogFragment attached")
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        try {
+            settingsManager = SettingsManager(requireContext())
+            Log.d(TAG, "✅ SettingsManager creado")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error creando SettingsManager: ${e.message}", e)
+        }
     }
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
-        Log.d(TAG, "📱 Creando diálogo de configuración")
+        Log.d(TAG, "📱 Creando diálogo...")
         
-        val view = try {
-            LayoutInflater.from(requireContext()).inflate(R.layout.dialog_settings, null)
+        return try {
+            val inflater = LayoutInflater.from(requireContext())
+            val view = inflater.inflate(R.layout.dialog_settings, null)
+            
+            setupViews(view)
+            
+            AlertDialog.Builder(requireContext())
+                .setTitle("Configuración")
+                .setView(view)
+                .setPositiveButton("Aceptar") { dialog, _ ->
+                    Log.d(TAG, "✅ Configuración guardada")
+                    dialog.dismiss()
+                }
+                .setNegativeButton("Cancelar") { dialog, _ ->
+                    Log.d(TAG, "❌ Configuración cancelada")
+                    dialog.dismiss()
+                }
+                .create()
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error inflando layout: ${e.message}", e)
-            throw e
+            Log.e(TAG, "❌ Error fatal creando diálogo: ${e.message}", e)
+            AlertDialog.Builder(requireContext())
+                .setTitle("Error")
+                .setMessage("No se pudo abrir la configuración: ${e.message}")
+                .setPositiveButton("OK", null)
+                .create()
         }
+    }
 
+    private fun setupViews(view: View) {
         try {
-            initializeViews(view)
-            setupLanguageSpinner()
-            loadCurrentSettings()
-            setupListeners()
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Error inicializando diálogo: ${e.message}", e)
-        }
+            val sensitivitySeek = view.findViewById<SeekBar>(R.id.sensitivitySeek)
+            val confidenceSeek = view.findViewById<SeekBar>(R.id.confidenceSeek)
+            val soundSwitch = view.findViewById<Switch>(R.id.soundSwitch)
+            val themeSwitch = view.findViewById<Switch>(R.id.themeSwitch)
+            val languageSpinner = view.findViewById<Spinner>(R.id.languageSpinner)
+            val sensitivityLabel = view.findViewById<TextView>(R.id.sensitivityValue)
+            val confidenceLabel = view.findViewById<TextView>(R.id.confidenceValue)
 
-        return MaterialAlertDialogBuilder(requireContext())
-            .setTitle(getString(R.string.settings))
-            .setView(view)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                Log.d(TAG, "✅ Configuración guardada")
+            if (sensitivitySeek == null || confidenceSeek == null || soundSwitch == null ||
+                themeSwitch == null || languageSpinner == null || sensitivityLabel == null ||
+                confidenceLabel == null) {
+                Log.e(TAG, "❌ Alguna vista es null")
+                return
             }
-            .setNegativeButton(android.R.string.cancel, null)
-            .create()
-    }
 
-    private fun initializeViews(view: android.view.View) {
-        try {
-            sensitivitySeek = view.findViewById(R.id.sensitivitySeek)
-            confidenceSeek = view.findViewById(R.id.confidenceSeek)
-            soundSwitch = view.findViewById(R.id.soundSwitch)
-            themeSwitch = view.findViewById(R.id.themeSwitch)
-            languageSpinner = view.findViewById(R.id.languageSpinner)
-            sensitivityLabel = view.findViewById(R.id.sensitivityValue)
-            confidenceLabel = view.findViewById(R.id.confidenceValue)
-            
-            Log.d(TAG, "✅ Vistas inicializadas correctamente")
+            Log.d(TAG, "✅ Todas las vistas encontradas")
+
+            // Configurar spinner de idiomas
+            setupLanguageSpinner(languageSpinner)
+
+            // Cargar configuración actual
+            loadSettings(
+                sensitivitySeek, confidenceSeek, soundSwitch, 
+                themeSwitch, languageSpinner, sensitivityLabel, confidenceLabel
+            )
+
+            // Configurar listeners
+            setupListeners(
+                sensitivitySeek, confidenceSeek, soundSwitch,
+                themeSwitch, languageSpinner, sensitivityLabel, confidenceLabel
+            )
+
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error inicializando vistas: ${e.message}", e)
-            throw e
+            Log.e(TAG, "❌ Error en setupViews: ${e.message}", e)
         }
     }
 
-    private fun setupLanguageSpinner() {
+    private fun setupLanguageSpinner(spinner: Spinner) {
         try {
-            val languages = listOf("Español", "English", "Français", "Italiano", "Deutsch", "Русский")
-            val adapter = ArrayAdapter(
-                requireContext(),
-                android.R.layout.simple_spinner_item,
-                languages
-            )
+            val languages = arrayOf("Español", "English", "Français", "Italiano", "Deutsch", "Русский")
+            val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, languages)
             adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-            languageSpinner?.adapter = adapter
-            
-            Log.d(TAG, "✅ Spinner de idiomas configurado")
+            spinner.adapter = adapter
+            Log.d(TAG, "✅ Spinner configurado")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error configurando spinner: ${e.message}", e)
         }
     }
 
-    private fun loadCurrentSettings() {
+    private fun loadSettings(
+        sensitivitySeek: SeekBar,
+        confidenceSeek: SeekBar,
+        soundSwitch: Switch,
+        themeSwitch: Switch,
+        languageSpinner: Spinner,
+        sensitivityLabel: TextView,
+        confidenceLabel: TextView
+    ) {
         lifecycleScope.launch {
             try {
                 val settings = settingsManager.settingsFlow.first()
                 
-                sensitivitySeek?.progress = (settings.sensitivity * 100).toInt()
-                confidenceSeek?.progress = (settings.minConfidence * 100).toInt()
-                soundSwitch?.isChecked = settings.soundEnabled
+                val sensProgress = (settings.sensitivity * 100).toInt()
+                val confProgress = (settings.minConfidence * 100).toInt()
+                
+                sensitivitySeek.progress = sensProgress
+                confidenceSeek.progress = confProgress
+                soundSwitch.isChecked = settings.soundEnabled
+                
+                sensitivityLabel.text = "$sensProgress%"
+                confidenceLabel.text = "$confProgress%"
                 
                 val prefs = requireContext().getSharedPreferences("theme_prefs", Context.MODE_PRIVATE)
-                themeSwitch?.isChecked = prefs.getBoolean("dark_mode", false)
+                themeSwitch.isChecked = prefs.getBoolean("dark_mode", false)
 
-                val languageIndex = when (settings.language) {
+                val langIndex = when (settings.language) {
                     "en" -> 1
                     "fr" -> 2
                     "it" -> 3
@@ -116,29 +147,39 @@ class SettingsDialogFragment : DialogFragment() {
                     "ru" -> 5
                     else -> 0
                 }
-                languageSpinner?.setSelection(languageIndex)
+                languageSpinner.setSelection(langIndex)
 
-                sensitivityLabel?.text = "${(settings.sensitivity * 100).toInt()}%"
-                confidenceLabel?.text = "${(settings.minConfidence * 100).toInt()}%"
-                
-                Log.d(TAG, "✅ Configuración cargada: sens=${settings.sensitivity}, conf=${settings.minConfidence}")
+                Log.d(TAG, "✅ Configuración cargada: sens=$sensProgress%, conf=$confProgress%")
             } catch (e: Exception) {
-                Log.e(TAG, "❌ Error cargando configuración: ${e.message}", e)
+                Log.e(TAG, "❌ Error cargando settings: ${e.message}", e)
             }
         }
     }
 
-    private fun setupListeners() {
+    private fun setupListeners(
+        sensitivitySeek: SeekBar,
+        confidenceSeek: SeekBar,
+        soundSwitch: Switch,
+        themeSwitch: Switch,
+        languageSpinner: Spinner,
+        sensitivityLabel: TextView,
+        confidenceLabel: TextView
+    ) {
         try {
             // Sensibilidad
-            sensitivitySeek?.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            sensitivitySeek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                     if (fromUser) {
+                        sensitivityLabel.text = "$progress%"
                         val value = progress / 100f
                         lifecycleScope.launch {
-                            settingsManager.updateSensitivity(value)
+                            try {
+                                settingsManager.updateSensitivity(value)
+                                Log.d(TAG, "📊 Sensibilidad: $progress%")
+                            } catch (e: Exception) {
+                                Log.e(TAG, "❌ Error actualizando sensibilidad: ${e.message}")
+                            }
                         }
-                        sensitivityLabel?.text = "$progress%"
                     }
                 }
                 override fun onStartTrackingTouch(seekBar: SeekBar?) {}
@@ -146,14 +187,19 @@ class SettingsDialogFragment : DialogFragment() {
             })
 
             // Confianza
-            confidenceSeek?.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            confidenceSeek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                     if (fromUser) {
+                        confidenceLabel.text = "$progress%"
                         val value = progress / 100f
                         lifecycleScope.launch {
-                            settingsManager.updateMinConfidence(value)
+                            try {
+                                settingsManager.updateMinConfidence(value)
+                                Log.d(TAG, "📊 Confianza: $progress%")
+                            } catch (e: Exception) {
+                                Log.e(TAG, "❌ Error actualizando confianza: ${e.message}")
+                            }
                         }
-                        confidenceLabel?.text = "$progress%"
                     }
                 }
                 override fun onStartTrackingTouch(seekBar: SeekBar?) {}
@@ -161,34 +207,41 @@ class SettingsDialogFragment : DialogFragment() {
             })
 
             // Sonido
-            soundSwitch?.setOnCheckedChangeListener { _, isChecked ->
+            soundSwitch.setOnCheckedChangeListener { _, isChecked ->
                 lifecycleScope.launch {
-                    settingsManager.updateSoundEnabled(isChecked)
-                    Log.d(TAG, "🔊 Sonido: $isChecked")
+                    try {
+                        settingsManager.updateSoundEnabled(isChecked)
+                        Log.d(TAG, "🔊 Sonido: $isChecked")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "❌ Error actualizando sonido: ${e.message}")
+                    }
                 }
             }
 
             // Tema
-            themeSwitch?.setOnCheckedChangeListener { _, isChecked ->
+            themeSwitch.setOnCheckedChangeListener { _, isChecked ->
                 try {
                     val prefs = requireContext().getSharedPreferences("theme_prefs", Context.MODE_PRIVATE)
                     prefs.edit().putBoolean("dark_mode", isChecked).apply()
                     
-                    (activity as? MainActivity)?.let { mainActivity ->
-                        mainActivity.applyTheme(isChecked)
-                        mainActivity.recreate()
-                    }
+                    Toast.makeText(requireContext(), "Reinicie la app para aplicar el tema", Toast.LENGTH_SHORT).show()
                     
-                    Log.d(TAG, "🎨 Tema cambiado: dark=$isChecked")
+                    Log.d(TAG, "🎨 Tema: $isChecked")
                 } catch (e: Exception) {
-                    Log.e(TAG, "❌ Error cambiando tema: ${e.message}", e)
+                    Log.e(TAG, "❌ Error actualizando tema: ${e.message}")
                 }
             }
 
             // Idioma
-            languageSpinner?.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-                override fun onItemSelected(parent: AdapterView<*>?, view: android.view.View?, pos: Int, id: Long) {
-                    val langCode = when (pos) {
+            var isFirstSelection = true
+            languageSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                    if (isFirstSelection) {
+                        isFirstSelection = false
+                        return
+                    }
+                    
+                    val langCode = when (position) {
                         1 -> "en"
                         2 -> "fr"
                         3 -> "it"
@@ -196,32 +249,23 @@ class SettingsDialogFragment : DialogFragment() {
                         5 -> "ru"
                         else -> "es"
                     }
+                    
                     lifecycleScope.launch {
-                        settingsManager.updateLanguage(langCode)
-                        Log.d(TAG, "🌍 Idioma cambiado: $langCode")
+                        try {
+                            settingsManager.updateLanguage(langCode)
+                            Log.d(TAG, "🌍 Idioma: $langCode")
+                        } catch (e: Exception) {
+                            Log.e(TAG, "❌ Error actualizando idioma: ${e.message}")
+                        }
                     }
                 }
 
                 override fun onNothingSelected(parent: AdapterView<*>?) {}
             }
-            
+
             Log.d(TAG, "✅ Listeners configurados")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error configurando listeners: ${e.message}", e)
         }
-    }
-
-    override fun onDestroyView() {
-        super.onDestroyView()
-        // Limpiar referencias
-        sensitivitySeek = null
-        confidenceSeek = null
-        soundSwitch = null
-        themeSwitch = null
-        languageSpinner = null
-        sensitivityLabel = null
-        confidenceLabel = null
-        
-        Log.d(TAG, "🗑️ Vista destruida")
     }
 }

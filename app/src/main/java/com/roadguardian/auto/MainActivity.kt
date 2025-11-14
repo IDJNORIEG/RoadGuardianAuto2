@@ -2,11 +2,11 @@ package com.roadguardian.auto
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.media.MediaPlayer
 import android.os.Bundle
 import android.util.Log
 import android.widget.Button
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.view.PreviewView
@@ -29,7 +29,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var detectionManager: DetectionManager
     private lateinit var settingsManager: SettingsManager
 
-    private var mediaPlayer: MediaPlayer? = null
     private var totalDetections = 0
     private var currentLanguage = "es"
     private var detecting = false
@@ -43,74 +42,79 @@ class MainActivity : AppCompatActivity() {
         
         Log.i(TAG, "🚀 Iniciando MainActivity")
         
-        // Aplicar tema según preferencias
-        val isDarkMode = getSharedPreferences("theme_prefs", MODE_PRIVATE)
-            .getBoolean("dark_mode", false)
-        applyTheme(isDarkMode)
+        // Aplicar tema
+        applyTheme()
         
         setContentView(R.layout.activity_main)
 
-        initializeViews()
-        initializeManagers()
-        setupListeners()
-        
         try {
-            mediaPlayer = MediaPlayer.create(this, R.raw.alert_sound)
-            Log.d(TAG, "🔊 MediaPlayer inicializado")
+            initializeViews()
+            initializeManagers()
+            setupListeners()
+            checkCameraPermission()
+            
+            Log.i(TAG, "✅ MainActivity inicializada correctamente")
         } catch (e: Exception) {
-            Log.e(TAG, "⚠️ No se pudo cargar sonido de alerta: ${e.message}")
+            Log.e(TAG, "❌ Error en onCreate: ${e.message}", e)
+            Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_LONG).show()
         }
+    }
 
-        // Cargar idioma desde DataStore
-        lifecycleScope.launch {
-            settingsManager.settingsFlow.collect { settings ->
-                currentLanguage = settings.language
-                Log.d(TAG, "🌍 Idioma actualizado: $currentLanguage")
+    private fun applyTheme() {
+        try {
+            val prefs = getSharedPreferences("theme_prefs", MODE_PRIVATE)
+            val isDarkMode = prefs.getBoolean("dark_mode", false)
+            
+            if (isDarkMode) {
+                setTheme(R.style.Theme_RoadGuardianAuto_Dark)
+                Log.d(TAG, "🌙 Tema oscuro aplicado")
+            } else {
+                setTheme(R.style.Theme_RoadGuardianAuto)
+                Log.d(TAG, "☀️ Tema claro aplicado")
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error aplicando tema: ${e.message}")
         }
-
-        // Verificar permisos de cámara
-        checkCameraPermission()
     }
 
     private fun initializeViews() {
-        try {
-            previewView = findViewById(R.id.previewView)
-            overlayView = findViewById(R.id.detectionOverlay)
-            counterText = findViewById(R.id.counterText)
-            statusText = findViewById(R.id.statusText)
-            startButton = findViewById(R.id.startButton)
-            settingsButton = findViewById(R.id.settingsButton)
-            
-            Log.d(TAG, "✅ Vistas inicializadas")
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Error inicializando vistas: ${e.message}", e)
-        }
+        previewView = findViewById(R.id.previewView)
+        overlayView = findViewById(R.id.detectionOverlay)
+        counterText = findViewById(R.id.counterText)
+        statusText = findViewById(R.id.statusText)
+        startButton = findViewById(R.id.startButton)
+        settingsButton = findViewById(R.id.settingsButton)
+        
+        Log.d(TAG, "✅ Vistas inicializadas")
     }
 
     private fun initializeManagers() {
-        try {
-            detectionManager = DetectionManager(this)
-            settingsManager = SettingsManager(this)
-            
-            cameraManager = CameraManager(
-                context = this,
-                lifecycleOwner = this,
-                previewView = previewView,
-                overlayView = overlayView,
-                detectionManager = detectionManager,
-                currentLanguageProvider = { currentLanguage },
-                onDetectionsUpdate = { detections ->
-                    runOnUiThread {
-                        updateDetectionUI(detections)
-                    }
+        detectionManager = DetectionManager(this)
+        settingsManager = SettingsManager(this)
+        
+        cameraManager = CameraManager(
+            context = this,
+            lifecycleOwner = this,
+            previewView = previewView,
+            overlayView = overlayView,
+            detectionManager = detectionManager,
+            currentLanguageProvider = { currentLanguage },
+            onDetectionsUpdate = { detections ->
+                runOnUiThread {
+                    updateDetectionUI(detections)
                 }
-            )
-            
-            Log.d(TAG, "✅ Managers inicializados")
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Error inicializando managers: ${e.message}", e)
+            }
+        )
+        
+        // Cargar idioma
+        lifecycleScope.launch {
+            settingsManager.settingsFlow.collect { settings ->
+                currentLanguage = settings.language
+                Log.d(TAG, "🌍 Idioma: $currentLanguage")
+            }
         }
+        
+        Log.d(TAG, "✅ Managers inicializados")
     }
 
     private fun setupListeners() {
@@ -125,15 +129,23 @@ class MainActivity : AppCompatActivity() {
 
         settingsButton.setOnClickListener {
             Log.d(TAG, "⚙️ Abriendo configuración")
-            showSettingsDialog()
+            try {
+                val dialog = SettingsDialogFragment()
+                dialog.show(supportFragmentManager, "SettingsDialog")
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error mostrando diálogo: ${e.message}", e)
+                Toast.makeText(this, "Error abriendo configuración: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
         }
+        
+        Log.d(TAG, "✅ Listeners configurados")
     }
 
     private fun checkCameraPermission() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
             == PackageManager.PERMISSION_GRANTED) {
             statusText.text = getString(R.string.status_ready)
-            Log.i(TAG, "✅ Permiso de cámara ya otorgado")
+            Log.i(TAG, "✅ Permiso de cámara otorgado")
         } else {
             Log.w(TAG, "⚠️ Solicitando permiso de cámara")
             requestPermissionLauncher.launch(Manifest.permission.CAMERA)
@@ -144,18 +156,18 @@ class MainActivity : AppCompatActivity() {
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
             if (isGranted) {
                 statusText.text = getString(R.string.status_ready)
-                Log.i(TAG, "✅ Permiso de cámara otorgado")
+                Log.i(TAG, "✅ Permiso concedido")
             } else {
                 statusText.text = getString(R.string.camera_permission_required)
-                Log.e(TAG, "❌ Permiso de cámara denegado")
+                Log.e(TAG, "❌ Permiso denegado")
+                Toast.makeText(this, "Se requiere permiso de cámara", Toast.LENGTH_LONG).show()
             }
         }
 
     private fun startDetection() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
             != PackageManager.PERMISSION_GRANTED) {
-            statusText.text = getString(R.string.camera_permission_required)
-            Log.e(TAG, "❌ No hay permiso de cámara")
+            Toast.makeText(this, "Permiso de cámara requerido", Toast.LENGTH_SHORT).show()
             return
         }
         
@@ -169,10 +181,11 @@ class MainActivity : AppCompatActivity() {
             totalDetections = 0
             counterText.text = "0"
             
-            Log.i(TAG, "✅ Detección iniciada correctamente")
+            Toast.makeText(this, "Detección iniciada", Toast.LENGTH_SHORT).show()
+            Log.i(TAG, "✅ Detección iniciada")
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error iniciando detección: ${e.message}", e)
-            statusText.text = "Error: ${e.message}"
+            Log.e(TAG, "❌ Error iniciando: ${e.message}", e)
+            Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -188,9 +201,10 @@ class MainActivity : AppCompatActivity() {
             totalDetections = 0
             counterText.text = "0"
             
-            Log.i(TAG, "✅ Detección detenida correctamente")
+            Toast.makeText(this, "Detección detenida", Toast.LENGTH_SHORT).show()
+            Log.i(TAG, "✅ Detección detenida")
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error deteniendo detección: ${e.message}", e)
+            Log.e(TAG, "❌ Error deteniendo: ${e.message}", e)
         }
     }
 
@@ -199,44 +213,15 @@ class MainActivity : AppCompatActivity() {
             totalDetections += detections.size
             counterText.text = totalDetections.toString()
             
-            Log.i(TAG, "📊 Total detecciones: $totalDetections")
+            Log.i(TAG, "📊 Total: $totalDetections")
             
-            playAlert()
-        }
-    }
-
-    private fun showSettingsDialog() {
-        try {
-            val dialog = SettingsDialogFragment()
-            dialog.show(supportFragmentManager, "SettingsDialog")
-            Log.d(TAG, "✅ Diálogo de configuración mostrado")
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Error mostrando diálogo: ${e.message}", e)
-        }
-    }
-
-    private fun playAlert() {
-        lifecycleScope.launch {
+            // Vibrar en vez de sonido
             try {
-                settingsManager.settingsFlow.collect { settings ->
-                    if (settings.soundEnabled && mediaPlayer?.isPlaying == false) {
-                        mediaPlayer?.start()
-                        Log.d(TAG, "🔊 Reproduciendo alerta sonora")
-                    }
-                }
+                val vibrator = getSystemService(VIBRATOR_SERVICE) as? android.os.Vibrator
+                vibrator?.vibrate(200)
             } catch (e: Exception) {
-                Log.e(TAG, "❌ Error reproduciendo alerta: ${e.message}")
+                Log.w(TAG, "No se pudo vibrar: ${e.message}")
             }
-        }
-    }
-
-    fun applyTheme(darkMode: Boolean) {
-        if (darkMode) {
-            setTheme(R.style.Theme_RoadGuardianAuto_Dark)
-            Log.d(TAG, "🌙 Tema oscuro aplicado")
-        } else {
-            setTheme(R.style.Theme_RoadGuardianAuto)
-            Log.d(TAG, "☀️ Tema claro aplicado")
         }
     }
 
@@ -245,7 +230,6 @@ class MainActivity : AppCompatActivity() {
         Log.w(TAG, "🔴 Destruyendo MainActivity")
         
         try {
-            mediaPlayer?.release()
             detectionManager.release()
             if (detecting) {
                 cameraManager.stopCamera()
@@ -257,17 +241,25 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
-        Log.d(TAG, "⏸️ MainActivity pausada")
+        Log.d(TAG, "⏸️ Pausada")
         if (detecting) {
-            cameraManager.stopCamera()
+            try {
+                cameraManager.stopCamera()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error pausando: ${e.message}")
+            }
         }
     }
 
     override fun onResume() {
         super.onResume()
-        Log.d(TAG, "▶️ MainActivity resumida")
+        Log.d(TAG, "▶️ Resumida")
         if (detecting) {
-            cameraManager.initializeCamera()
+            try {
+                cameraManager.initializeCamera()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error resumiendo: ${e.message}")
+            }
         }
     }
 }
