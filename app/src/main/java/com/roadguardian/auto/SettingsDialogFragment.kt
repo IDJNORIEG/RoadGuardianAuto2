@@ -19,6 +19,19 @@ class SettingsDialogFragment : DialogFragment() {
     
     companion object {
         private const val TAG = "SettingsDialog"
+        
+        // Mapeo de idiomas
+        private val LANGUAGE_MAP = mapOf(
+            "Español" to "es",
+            "English" to "en",
+            "Français" to "fr",
+            "Italiano" to "it",
+            "Deutsch" to "de",
+            "Русский" to "ru"
+        )
+        
+        private val LANGUAGE_CODES = LANGUAGE_MAP.values.toList()
+        private val LANGUAGE_NAMES = LANGUAGE_MAP.keys.toList()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -103,11 +116,16 @@ class SettingsDialogFragment : DialogFragment() {
 
     private fun setupLanguageSpinner(spinner: Spinner) {
         try {
-            val languages = arrayOf("Español", "English", "Français", "Italiano", "Deutsch", "Русский")
-            val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, languages)
+            // Usar nombres de idiomas en su idioma nativo
+            val adapter = ArrayAdapter(
+                requireContext(),
+                android.R.layout.simple_spinner_item,
+                LANGUAGE_NAMES
+            )
             adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
             spinner.adapter = adapter
-            Log.d(TAG, "✅ Spinner configurado")
+            
+            Log.d(TAG, "✅ Spinner de idiomas configurado con ${LANGUAGE_NAMES.size} opciones")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error configurando spinner: ${e.message}", e)
         }
@@ -139,17 +157,15 @@ class SettingsDialogFragment : DialogFragment() {
                 val prefs = requireContext().getSharedPreferences("theme_prefs", Context.MODE_PRIVATE)
                 themeSwitch.isChecked = prefs.getBoolean("dark_mode", false)
 
-                val langIndex = when (settings.language) {
-                    "en" -> 1
-                    "fr" -> 2
-                    "it" -> 3
-                    "de" -> 4
-                    "ru" -> 5
-                    else -> 0
+                // Establecer idioma actual en el spinner
+                val currentLangCode = settings.language
+                val langIndex = LANGUAGE_CODES.indexOf(currentLangCode)
+                if (langIndex >= 0) {
+                    languageSpinner.setSelection(langIndex)
+                    Log.d(TAG, "✅ Idioma actual: ${LANGUAGE_NAMES[langIndex]} ($currentLangCode)")
                 }
-                languageSpinner.setSelection(langIndex)
 
-                Log.d(TAG, "✅ Configuración cargada: sens=$sensProgress%, conf=$confProgress%")
+                Log.d(TAG, "✅ Configuración cargada")
             } catch (e: Exception) {
                 Log.e(TAG, "❌ Error cargando settings: ${e.message}", e)
             }
@@ -212,6 +228,11 @@ class SettingsDialogFragment : DialogFragment() {
                     try {
                         settingsManager.updateSoundEnabled(isChecked)
                         Log.d(TAG, "🔊 Sonido: $isChecked")
+                        Toast.makeText(
+                            requireContext(),
+                            if (isChecked) "Sonido activado" else "Sonido desactivado",
+                            Toast.LENGTH_SHORT
+                        ).show()
                     } catch (e: Exception) {
                         Log.e(TAG, "❌ Error actualizando sonido: ${e.message}")
                     }
@@ -224,7 +245,11 @@ class SettingsDialogFragment : DialogFragment() {
                     val prefs = requireContext().getSharedPreferences("theme_prefs", Context.MODE_PRIVATE)
                     prefs.edit().putBoolean("dark_mode", isChecked).apply()
                     
-                    Toast.makeText(requireContext(), "Reinicie la app para aplicar el tema", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        requireContext(),
+                        "Reinicie la app para aplicar el tema",
+                        Toast.LENGTH_SHORT
+                    ).show()
                     
                     Log.d(TAG, "🎨 Tema: $isChecked")
                 } catch (e: Exception) {
@@ -241,21 +266,23 @@ class SettingsDialogFragment : DialogFragment() {
                         return
                     }
                     
-                    val langCode = when (position) {
-                        1 -> "en"
-                        2 -> "fr"
-                        3 -> "it"
-                        4 -> "de"
-                        5 -> "ru"
-                        else -> "es"
-                    }
-                    
-                    lifecycleScope.launch {
-                        try {
-                            settingsManager.updateLanguage(langCode)
-                            Log.d(TAG, "🌍 Idioma: $langCode")
-                        } catch (e: Exception) {
-                            Log.e(TAG, "❌ Error actualizando idioma: ${e.message}")
+                    if (position >= 0 && position < LANGUAGE_CODES.size) {
+                        val langCode = LANGUAGE_CODES[position]
+                        val langName = LANGUAGE_NAMES[position]
+                        
+                        lifecycleScope.launch {
+                            try {
+                                settingsManager.updateLanguage(langCode)
+                                Log.d(TAG, "🌍 Idioma cambiado: $langName ($langCode)")
+                                
+                                Toast.makeText(
+                                    requireContext(),
+                                    "Idioma: $langName",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } catch (e: Exception) {
+                                Log.e(TAG, "❌ Error actualizando idioma: ${e.message}")
+                            }
                         }
                     }
                 }

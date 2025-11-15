@@ -3,6 +3,8 @@ package com.roadguardian.auto
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.RectF
+import android.media.AudioAttributes
+import android.media.SoundPool
 import android.os.Bundle
 import android.util.Log
 import android.widget.Button
@@ -17,6 +19,7 @@ import com.roadguardian.auto.models.AnimalType
 import com.roadguardian.auto.models.Detection
 import com.roadguardian.auto.ui.DetectionOverlayView
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
@@ -32,9 +35,16 @@ class MainActivity : AppCompatActivity() {
     private lateinit var detectionManager: DetectionManager
     private lateinit var settingsManager: SettingsManager
 
+    // SoundPool para alertas
+    private var soundPool: SoundPool? = null
+    private var alertSoundId: Int = 0
+    private var lastAlertTime: Long = 0
+    private val ALERT_COOLDOWN = 2000L // 2 segundos entre alertas
+
     private var totalDetections = 0
     private var currentLanguage = "es"
     private var detecting = false
+    private var soundEnabled = true
 
     companion object {
         private const val TAG = "MainActivity"
@@ -51,10 +61,9 @@ class MainActivity : AppCompatActivity() {
         try {
             initializeViews()
             initializeManagers()
+            initializeSoundPool()
             setupListeners()
             checkCameraPermission()
-            
-            // Test visual del overlay después de 2 segundos
             testOverlay()
             
             Log.i(TAG, "✅ MainActivity inicializada")
@@ -64,13 +73,37 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun initializeSoundPool() {
+        try {
+            val audioAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+
+            soundPool = SoundPool.Builder()
+                .setMaxStreams(1)
+                .setAudioAttributes(audioAttributes)
+                .build()
+
+            // Cargar sonido de alerta
+            try {
+                alertSoundId = soundPool?.load(this, R.raw.alert_sound, 1) ?: 0
+                Log.d(TAG, "🔊 Sonido de alerta cargado: ID=$alertSoundId")
+            } catch (e: Exception) {
+                Log.w(TAG, "⚠️ No se pudo cargar alert_sound.mp3, usando sonido del sistema")
+                // Usar ToneGenerator como alternativa
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error inicializando SoundPool: ${e.message}")
+        }
+    }
+
     private fun testOverlay() {
         lifecycleScope.launch {
             delay(2000)
             
-            Log.d(TAG, "🧪 Ejecutando test de overlay...")
+            Log.d(TAG, "🧪 Test de overlay...")
             
-            // Crear detección de prueba
             val testDetection = Detection(
                 animal = AnimalType.DOG,
                 confidence = 0.85f,
@@ -78,11 +111,8 @@ class MainActivity : AppCompatActivity() {
                 boundingBox = RectF(100f, 100f, 500f, 500f)
             )
             
-            overlayView.updateDetections(listOf(testDetection), "es")
+            overlayView.updateDetections(listOf(testDetection), currentLanguage)
             
-            Toast.makeText(this@MainActivity, "Test: detección simulada mostrada", Toast.LENGTH_LONG).show()
-            
-            // Limpiar después de 3 segundos
             delay(3000)
             overlayView.clearDetections()
         }
@@ -111,13 +141,10 @@ class MainActivity : AppCompatActivity() {
         startButton = findViewById(R.id.startButton)
         settingsButton = findViewById(R.id.settingsButton)
         
-        // Asegurar que el overlay esté visible
         overlayView.bringToFront()
         overlayView.invalidate()
         
         Log.d(TAG, "✅ Vistas inicializadas")
-        Log.d(TAG, "   PreviewView: ${previewView.width}x${previewView.height}")
-        Log.d(TAG, "   OverlayView: ${overlayView.width}x${overlayView.height}")
     }
 
     private fun initializeManagers() {
@@ -138,10 +165,12 @@ class MainActivity : AppCompatActivity() {
             }
         )
         
+        // Cargar configuración
         lifecycleScope.launch {
             settingsManager.settingsFlow.collect { settings ->
                 currentLanguage = settings.language
-                Log.d(TAG, "🌍 Idioma: $currentLanguage")
+                soundEnabled = settings.soundEnabled
+                Log.d(TAG, "⚙️ Config: idioma=$currentLanguage, sonido=$soundEnabled")
             }
         }
         
@@ -239,6 +268,12 @@ class MainActivity : AppCompatActivity() {
             
             Log.i(TAG, "📊 Total: $totalDetections")
             
+            // Reproducir alerta sonora si está habilitada
+            if (soundEnabled) {
+                playAlert()
+            }
+            
+            // Vibrar
             try {
                 val vibrator = getSystemService(VIBRATOR_SERVICE) as? android.os.Vibrator
                 vibrator?.vibrate(200)
@@ -248,9 +283,40 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun playAlert() {
+        val currentTime = System.currentTimeMillis()
+        
+        // Cooldown para no saturar con sonidos
+        if (currentTime - lastAlertTime < ALERT_COOLDOWN) {
+            return
+        }
+        
+        lastAlertTime = currentTime
+        
+        try {
+            if (soundPool != null && alertSoundId > 0) {
+                soundPool?.play(alertSoundId, 1.0f, 1.0f, 1, 0, 1.0f)
+                Log.d(TAG, "🔊 Alerta sonora reproducida")
+            } else {
+                // Usar ToneGenerator como alternativa
+                val toneGen = android.media.ToneGenerator(
+                    android.media.AudioManager.STREAM_ALARM,
+                    100
+                )
+                toneGen.startTone(android.media.ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 200)
+                toneGen.release()
+                Log.d(TAG, "🔊 Tono de alerta reproducido (fallback)")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error reproduciendo alerta: ${e.message}")
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         try {
+            soundPool?.release()
+            soundPool = null
             detectionManager.release()
             if (detecting) {
                 cameraManager.stopCamera()
@@ -273,6 +339,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        
+        // Recargar configuración
+        lifecycleScope.launch {
+            val settings = settingsManager.settingsFlow.first()
+            soundEnabled = settings.soundEnabled
+        }
+        
         if (detecting) {
             try {
                 cameraManager.initializeCamera()
