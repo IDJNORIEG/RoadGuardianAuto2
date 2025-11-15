@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.ImageFormat
 import android.graphics.Rect
+import android.graphics.RectF
 import android.graphics.YuvImage
 import android.util.Log
 import androidx.camera.core.*
@@ -68,8 +69,6 @@ class CameraManager(
                 return
             }
 
-            Log.d(TAG, "📐 PreviewView: ${previewView.width}x${previewView.height}")
-
             val preview = Preview.Builder()
                 .setTargetRotation(previewView.display.rotation)
                 .build()
@@ -97,7 +96,7 @@ class CameraManager(
 
             cameraProvider.unbindAll()
 
-            val camera = cameraProvider.bindToLifecycle(
+            cameraProvider.bindToLifecycle(
                 lifecycleOwner,
                 cameraSelector,
                 preview,
@@ -108,7 +107,6 @@ class CameraManager(
             
             Log.i(TAG, SEPARATOR)
             Log.i(TAG, "✅ CÁMARA INICIADA CORRECTAMENTE")
-            Log.i(TAG, "   Resolución: 640x480")
             Log.i(TAG, SEPARATOR)
 
         } catch (e: Exception) {
@@ -141,24 +139,27 @@ class CameraManager(
             val bitmap = imageProxyToBitmap(imageProxy)
             
             if (bitmap == null) {
-                Log.w(TAG, "⚠️ Bitmap null en frame $frameCount")
+                Log.w(TAG, "⚠️ Bitmap null")
                 return
             }
 
-            if (frameCount % 30 == 0) {
-                Log.d(TAG, "   Bitmap: ${bitmap.width}x${bitmap.height}")
-            }
-
+            // Detectar con el bitmap original (antes de escalar)
             val detections = detectionManager.detectAnimals(bitmap)
 
             if (detections.isNotEmpty()) {
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
-                    updateDetections(detections)
+                    // Escalar las coordenadas de detección al tamaño de la vista
+                    val scaledDetections = scaleDetectionsToView(
+                        detections,
+                        bitmap.width,
+                        bitmap.height
+                    )
+                    updateDetections(scaledDetections)
                 }
             }
 
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error procesando frame $frameCount: ${e.message}", e)
+            Log.e(TAG, "❌ Error procesando frame: ${e.message}", e)
         } finally {
             imageProxy.close()
             processingFrame = false
@@ -200,21 +201,50 @@ class CameraManager(
             BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
             
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error convirtiendo a Bitmap: ${e.message}", e)
+            Log.e(TAG, "❌ Error convirtiendo: ${e.message}", e)
             null
+        }
+    }
+
+    private fun scaleDetectionsToView(
+        detections: List<Detection>,
+        sourceWidth: Int,
+        sourceHeight: Int
+    ): List<Detection> {
+        val viewWidth = previewView.width.toFloat()
+        val viewHeight = previewView.height.toFloat()
+        
+        if (viewWidth <= 0 || viewHeight <= 0) {
+            Log.w(TAG, "⚠️ Vista sin dimensiones válidas")
+            return detections
+        }
+
+        // Calcular escalas considerando el aspect ratio
+        val scaleX = viewWidth / sourceWidth
+        val scaleY = viewHeight / sourceHeight
+
+        Log.d(TAG, "📐 Escalado: source=${sourceWidth}x${sourceHeight}, view=${viewWidth.toInt()}x${viewHeight.toInt()}")
+        Log.d(TAG, "   Escalas: X=$scaleX, Y=$scaleY")
+
+        return detections.map { detection ->
+            val box = detection.boundingBox
+            
+            val scaledBox = RectF(
+                box.left * scaleX,
+                box.top * scaleY,
+                box.right * scaleX,
+                box.bottom * scaleY
+            )
+            
+            Log.d(TAG, "   Original: [${box.left}, ${box.top}, ${box.right}, ${box.bottom}]")
+            Log.d(TAG, "   Escalado: [${scaledBox.left}, ${scaledBox.top}, ${scaledBox.right}, ${scaledBox.bottom}]")
+            
+            detection.copy(boundingBox = scaledBox)
         }
     }
 
     private fun updateDetections(detections: List<Detection>) {
         try {
-            val viewWidth = previewView.width
-            val viewHeight = previewView.height
-            
-            if (viewWidth <= 0 || viewHeight <= 0) {
-                Log.w(TAG, "⚠️ Vista sin dimensiones: ${viewWidth}x${viewHeight}")
-                return
-            }
-
             Log.d(TAG, "🎨 Actualizando overlay: ${detections.size} detecciones")
 
             overlayView.updateDetections(detections, currentLanguageProvider.invoke())

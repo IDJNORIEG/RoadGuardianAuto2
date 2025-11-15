@@ -21,18 +21,17 @@ class DetectionOverlayView @JvmOverloads constructor(
     companion object {
         private const val TAG = "DetectionOverlay"
         
-        // Colores únicos por tipo de animal
         private val ANIMAL_COLORS = mapOf(
-            AnimalType.DOG to Color.parseColor("#FF5722"),      // Naranja rojizo
-            AnimalType.CAT to Color.parseColor("#9C27B0"),      // Púrpura
-            AnimalType.HORSE to Color.parseColor("#795548"),    // Marrón
-            AnimalType.COW to Color.parseColor("#FFEB3B"),      // Amarillo
-            AnimalType.SHEEP to Color.parseColor("#E0E0E0"),    // Gris claro
-            AnimalType.BIRD to Color.parseColor("#00BCD4"),     // Cian
-            AnimalType.ELEPHANT to Color.parseColor("#9E9E9E"), // Gris
-            AnimalType.BEAR to Color.parseColor("#8D6E63"),     // Marrón oscuro
-            AnimalType.ZEBRA to Color.parseColor("#000000"),    // Negro
-            AnimalType.GIRAFFE to Color.parseColor("#FF9800")   // Naranja
+            AnimalType.DOG to Color.parseColor("#FF5722"),
+            AnimalType.CAT to Color.parseColor("#9C27B0"),
+            AnimalType.HORSE to Color.parseColor("#795548"),
+            AnimalType.COW to Color.parseColor("#FFEB3B"),
+            AnimalType.SHEEP to Color.parseColor("#E0E0E0"),
+            AnimalType.BIRD to Color.parseColor("#00BCD4"),
+            AnimalType.ELEPHANT to Color.parseColor("#9E9E9E"),
+            AnimalType.BEAR to Color.parseColor("#8D6E63"),
+            AnimalType.ZEBRA to Color.parseColor("#000000"),
+            AnimalType.GIRAFFE to Color.parseColor("#FF9800")
         )
     }
 
@@ -49,13 +48,15 @@ class DetectionOverlayView @JvmOverloads constructor(
         detections.addAll(newDetections)
         currentLanguage = language
         
-        Log.d(TAG, "📊 Actualizando: ${newDetections.size} detecciones")
-        invalidate()
+        Log.d(TAG, "📊 Overlay actualizado: ${newDetections.size} detecciones")
+        
+        // Forzar redibujo inmediato
+        postInvalidate()
     }
 
     fun clearDetections() {
         detections.clear()
-        invalidate()
+        postInvalidate()
     }
 
     fun scaleDetections(
@@ -69,33 +70,50 @@ class DetectionOverlayView @JvmOverloads constructor(
         
         if (detections.isEmpty()) return
 
-        Log.d(TAG, "🎨 Dibujando ${detections.size} detecciones")
+        Log.d(TAG, "🎨 Dibujando ${detections.size} detecciones en canvas ${width}x${height}")
 
-        for (detection in detections) {
-            drawDetection(canvas, detection)
+        for ((index, detection) in detections.withIndex()) {
+            drawDetection(canvas, detection, index)
         }
     }
 
-    private fun drawDetection(canvas: Canvas, detection: Detection) {
+    private fun drawDetection(canvas: Canvas, detection: Detection, index: Int) {
         val box = detection.boundingBox
         
+        // Validar dimensiones
         if (box.width() <= 0 || box.height() <= 0) {
-            Log.w(TAG, "⚠️ BBox inválido: $box")
+            Log.w(TAG, "⚠️ BBox inválido: width=${box.width()}, height=${box.height()}")
             return
         }
 
-        // Obtener color según el tipo de animal
+        // Validar que esté dentro de los límites del canvas
+        if (box.left < 0 || box.top < 0 || box.right > width || box.bottom > height) {
+            Log.w(TAG, "⚠️ BBox fuera de límites: [${ box.left}, ${box.top}, ${box.right}, ${box.bottom}] en canvas ${width}x${height}")
+            // Ajustar al canvas
+            val adjustedBox = RectF(
+                box.left.coerceAtLeast(0f),
+                box.top.coerceAtLeast(0f),
+                box.right.coerceAtMost(width.toFloat()),
+                box.bottom.coerceAtMost(height.toFloat())
+            )
+            drawBoundingBox(canvas, adjustedBox, detection, index)
+        } else {
+            drawBoundingBox(canvas, box, detection, index)
+        }
+    }
+
+    private fun drawBoundingBox(canvas: Canvas, box: RectF, detection: Detection, index: Int) {
         val animalColor = ANIMAL_COLORS[detection.animal] ?: Color.GREEN
         
-        // Paint para el borde (delgado)
+        // Paint para borde (delgado)
         val boxPaint = Paint().apply {
             color = animalColor
             style = Paint.Style.STROKE
-            strokeWidth = 4f // Línea delgada
+            strokeWidth = 5f
             isAntiAlias = true
         }
 
-        // Paint para el fondo del texto
+        // Paint para fondo de texto
         val textBackgroundPaint = Paint().apply {
             color = animalColor
             style = Paint.Style.FILL
@@ -103,10 +121,10 @@ class DetectionOverlayView @JvmOverloads constructor(
             alpha = 220
         }
 
-        // Dibujar bounding box
+        // Dibujar rectángulo principal
         canvas.drawRect(box, boxPaint)
 
-        // Preparar texto
+        // Texto
         val animalName = detection.animal.getLocalizedName(currentLanguage)
         val label = "$animalName ${detection.getConfidencePercentage()}%"
         val distanceText = "${detection.distance}m"
@@ -114,7 +132,7 @@ class DetectionOverlayView @JvmOverloads constructor(
         val labelBounds = Rect()
         textPaint.getTextBounds(label, 0, label.length, labelBounds)
 
-        // Posición del texto (arriba del box)
+        // Posición del texto
         val textX = box.left + 10f
         val textY = if (box.top > 100) {
             box.top - 15f
@@ -131,11 +149,9 @@ class DetectionOverlayView @JvmOverloads constructor(
             textY + padding
         )
         canvas.drawRoundRect(backgroundRect, 10f, 10f, textBackgroundPaint)
-
-        // Dibujar texto
         canvas.drawText(label, textX, textY, textPaint)
 
-        // Distancia debajo
+        // Distancia
         val distanceBounds = Rect()
         textPaint.getTextBounds(distanceText, 0, distanceText.length, distanceBounds)
         
@@ -150,31 +166,29 @@ class DetectionOverlayView @JvmOverloads constructor(
         canvas.drawRoundRect(distanceBackgroundRect, 10f, 10f, textBackgroundPaint)
         canvas.drawText(distanceText, textX, distanceY, textPaint)
 
-        // Esquinas para mejor visibilidad
-        val cornerLength = 40f
+        // Esquinas mejoradas
+        val cornerLength = 50f
         val cornerPaint = Paint().apply {
             color = animalColor
             style = Paint.Style.STROKE
-            strokeWidth = 6f
+            strokeWidth = 8f
+            strokeCap = Paint.Cap.ROUND
             isAntiAlias = true
         }
 
-        // Esquina superior izquierda
+        // 4 esquinas
         canvas.drawLine(box.left, box.top, box.left + cornerLength, box.top, cornerPaint)
         canvas.drawLine(box.left, box.top, box.left, box.top + cornerLength, cornerPaint)
 
-        // Esquina superior derecha
         canvas.drawLine(box.right, box.top, box.right - cornerLength, box.top, cornerPaint)
         canvas.drawLine(box.right, box.top, box.right, box.top + cornerLength, cornerPaint)
 
-        // Esquina inferior izquierda
         canvas.drawLine(box.left, box.bottom, box.left + cornerLength, box.bottom, cornerPaint)
         canvas.drawLine(box.left, box.bottom, box.left, box.bottom - cornerLength, cornerPaint)
 
-        // Esquina inferior derecha
         canvas.drawLine(box.right, box.bottom, box.right - cornerLength, box.bottom, cornerPaint)
         canvas.drawLine(box.right, box.bottom, box.right, box.bottom - cornerLength, cornerPaint)
 
-        Log.d(TAG, "   Dibujado: $animalName (${String.format("#%06X", 0xFFFFFF and animalColor)})")
+        Log.d(TAG, "   ✅ Dibujado #${index + 1}: $animalName en [${box.left.toInt()}, ${box.top.toInt()}, ${box.right.toInt()}, ${box.bottom.toInt()}]")
     }
 }

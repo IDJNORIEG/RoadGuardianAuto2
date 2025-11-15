@@ -7,9 +7,8 @@ import android.media.AudioAttributes
 import android.media.SoundPool
 import android.os.Bundle
 import android.util.Log
-import android.widget.Button
-import android.widget.TextView
-import android.widget.Toast
+import android.view.View
+import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.view.PreviewView
@@ -30,16 +29,16 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
     private lateinit var startButton: Button
     private lateinit var settingsButton: Button
+    private lateinit var languageSpinner: Spinner
 
     private lateinit var cameraManager: CameraManager
     private lateinit var detectionManager: DetectionManager
     private lateinit var settingsManager: SettingsManager
 
-    // SoundPool para alertas
     private var soundPool: SoundPool? = null
     private var alertSoundId: Int = 0
     private var lastAlertTime: Long = 0
-    private val ALERT_COOLDOWN = 2000L // 2 segundos entre alertas
+    private val ALERT_COOLDOWN = 2000L
 
     private var totalDetections = 0
     private var currentLanguage = "es"
@@ -48,6 +47,18 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "MainActivity"
+        
+        private val LANGUAGE_MAP = mapOf(
+            "🇪🇸 ES" to "es",
+            "🇬🇧 EN" to "en",
+            "🇫🇷 FR" to "fr",
+            "🇮🇹 IT" to "it",
+            "🇩🇪 DE" to "de",
+            "🇷🇺 RU" to "ru"
+        )
+        
+        private val LANGUAGE_NAMES = LANGUAGE_MAP.keys.toList()
+        private val LANGUAGE_CODES = LANGUAGE_MAP.values.toList()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -63,6 +74,7 @@ class MainActivity : AppCompatActivity() {
             initializeManagers()
             initializeSoundPool()
             setupListeners()
+            setupLanguageSpinner()
             checkCameraPermission()
             testOverlay()
             
@@ -85,13 +97,11 @@ class MainActivity : AppCompatActivity() {
                 .setAudioAttributes(audioAttributes)
                 .build()
 
-            // Cargar sonido de alerta
             try {
                 alertSoundId = soundPool?.load(this, R.raw.alert_sound, 1) ?: 0
-                Log.d(TAG, "🔊 Sonido de alerta cargado: ID=$alertSoundId")
+                Log.d(TAG, "🔊 Sonido cargado: ID=$alertSoundId")
             } catch (e: Exception) {
-                Log.w(TAG, "⚠️ No se pudo cargar alert_sound.mp3, usando sonido del sistema")
-                // Usar ToneGenerator como alternativa
+                Log.w(TAG, "⚠️ No se pudo cargar alert_sound.mp3")
             }
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error inicializando SoundPool: ${e.message}")
@@ -140,11 +150,60 @@ class MainActivity : AppCompatActivity() {
         statusText = findViewById(R.id.statusText)
         startButton = findViewById(R.id.startButton)
         settingsButton = findViewById(R.id.settingsButton)
+        languageSpinner = findViewById(R.id.languageSpinner)
         
         overlayView.bringToFront()
         overlayView.invalidate()
         
         Log.d(TAG, "✅ Vistas inicializadas")
+    }
+
+    private fun setupLanguageSpinner() {
+        try {
+            val adapter = ArrayAdapter(
+                this,
+                android.R.layout.simple_spinner_item,
+                LANGUAGE_NAMES
+            )
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            languageSpinner.adapter = adapter
+            
+            // Cargar idioma guardado
+            lifecycleScope.launch {
+                val settings = settingsManager.settingsFlow.first()
+                val index = LANGUAGE_CODES.indexOf(settings.language)
+                if (index >= 0) {
+                    languageSpinner.setSelection(index)
+                }
+            }
+            
+            // Listener para cambios
+            var isFirstSelection = true
+            languageSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                    if (isFirstSelection) {
+                        isFirstSelection = false
+                        return
+                    }
+                    
+                    if (position >= 0 && position < LANGUAGE_CODES.size) {
+                        val langCode = LANGUAGE_CODES[position]
+                        currentLanguage = langCode
+                        
+                        lifecycleScope.launch {
+                            settingsManager.updateLanguage(langCode)
+                            Log.d(TAG, "🌍 Idioma: $langCode")
+                        }
+                    }
+                }
+
+                override fun onNothingSelected(parent: AdapterView<*>?) {}
+            }
+            
+            Log.d(TAG, "✅ Selector de idioma configurado")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error configurando selector: ${e.message}")
+        }
     }
 
     private fun initializeManagers() {
@@ -165,7 +224,6 @@ class MainActivity : AppCompatActivity() {
             }
         )
         
-        // Cargar configuración
         lifecycleScope.launch {
             settingsManager.settingsFlow.collect { settings ->
                 currentLanguage = settings.language
@@ -268,12 +326,10 @@ class MainActivity : AppCompatActivity() {
             
             Log.i(TAG, "📊 Total: $totalDetections")
             
-            // Reproducir alerta sonora si está habilitada
             if (soundEnabled) {
                 playAlert()
             }
             
-            // Vibrar
             try {
                 val vibrator = getSystemService(VIBRATOR_SERVICE) as? android.os.Vibrator
                 vibrator?.vibrate(200)
@@ -286,7 +342,6 @@ class MainActivity : AppCompatActivity() {
     private fun playAlert() {
         val currentTime = System.currentTimeMillis()
         
-        // Cooldown para no saturar con sonidos
         if (currentTime - lastAlertTime < ALERT_COOLDOWN) {
             return
         }
@@ -296,16 +351,15 @@ class MainActivity : AppCompatActivity() {
         try {
             if (soundPool != null && alertSoundId > 0) {
                 soundPool?.play(alertSoundId, 1.0f, 1.0f, 1, 0, 1.0f)
-                Log.d(TAG, "🔊 Alerta sonora reproducida")
+                Log.d(TAG, "🔊 Alerta reproducida")
             } else {
-                // Usar ToneGenerator como alternativa
                 val toneGen = android.media.ToneGenerator(
                     android.media.AudioManager.STREAM_ALARM,
                     100
                 )
                 toneGen.startTone(android.media.ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 200)
                 toneGen.release()
-                Log.d(TAG, "🔊 Tono de alerta reproducido (fallback)")
+                Log.d(TAG, "🔊 Tono reproducido")
             }
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error reproduciendo alerta: ${e.message}")
@@ -340,10 +394,10 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         
-        // Recargar configuración
         lifecycleScope.launch {
             val settings = settingsManager.settingsFlow.first()
             soundEnabled = settings.soundEnabled
+            currentLanguage = settings.language
         }
         
         if (detecting) {

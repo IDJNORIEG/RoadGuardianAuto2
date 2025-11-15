@@ -4,24 +4,28 @@
     android:layout_height="match_parent"
     android:background="@color/background_dark">
 
+    <!-- Barra superior -->
     <LinearLayout
         android:id="@+id/topBar"
         android:layout_width="match_parent"
         android:layout_height="60dp"
         android:background="@color/surface_dark"
         android:orientation="horizontal"
-        android:padding="8dp">
+        android:padding="8dp"
+        android:gravity="center_vertical">
 
+        <!-- Botón de inicio (más pequeño) -->
         <Button
             android:id="@+id/startButton"
-            android:layout_width="0dp"
+            android:layout_width="140dp"
             android:layout_height="match_parent"
             android:layout_margin="4dp"
-            android:layout_weight="1"
             android:backgroundTint="@color/primary"
             android:text="@string/start_detection"
+            android:textSize="12sp"
             android:textColor="@color/text_white"/>
 
+        <!-- Estado -->
         <TextView
             android:id="@+id/statusText"
             android:layout_width="0dp"
@@ -30,21 +34,31 @@
             android:layout_weight="1"
             android:gravity="center"
             android:text="@string/status_ready"
-            android:textColor="@color/primary"
-            android:textSize="16sp"/>
+            android:textSize="14sp"
+            android:textColor="@color/primary"/>
 
+        <!-- Contador -->
         <TextView
             android:id="@+id/counterText"
-            android:layout_width="0dp"
+            android:layout_width="50dp"
             android:layout_height="match_parent"
             android:layout_margin="4dp"
-            android:layout_weight="0.5"
             android:gravity="center"
             android:text="0"
-            android:textColor="@color/accent"
             android:textSize="20sp"
-            android:textStyle="bold"/>
+            android:textStyle="bold"
+            android:textColor="@color/accent"/>
 
+        <!-- Selector de idioma -->
+        <Spinner
+            android:id="@+id/languageSpinner"
+            android:layout_width="100dp"
+            android:layout_height="match_parent"
+            android:layout_margin="4dp"
+            android:background="@android:drawable/btn_dropdown"
+            android:spinnerMode="dropdown"/>
+
+        <!-- Botón de ajustes -->
         <Button
             android:id="@+id/settingsButton"
             android:layout_width="50dp"
@@ -54,17 +68,20 @@
             android:textSize="20sp"/>
     </LinearLayout>
 
+    <!-- Contenedor de cámara y overlay -->
     <FrameLayout
         android:id="@+id/cameraContainer"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_below="@id/topBar">
 
+        <!-- Vista previa de cámara -->
         <androidx.camera.view.PreviewView
             android:id="@+id/previewView"
             android:layout_width="match_parent"
             android:layout_height="match_parent"/>
 
+        <!-- Overlay de detecciones -->
         <com.roadguardian.auto.ui.DetectionOverlayView
             android:id="@+id/detectionOverlay"
             android:layout_width="match_parent"
