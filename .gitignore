@@ -9,3 +9,14 @@ captures/
 local.properties
 .idea/
 .DS_Store
+descargadordemodeloyolo.py
+.gitignore
+yolov8n.onnx
+yolov8n.pt
+yolov8n_saved_model/fingerprint.pb
+yolov8n_saved_model/metadata.yaml
+yolov8n_saved_model/saved_model.pb
+yolov8n_saved_model/yolov8n_float16.tflite
+yolov8n_saved_model/yolov8n_float32.tflite
+yolov8n_saved_model/variables/variables.data-00000-of-00001
+yolov8n_saved_model/variables/variables.index

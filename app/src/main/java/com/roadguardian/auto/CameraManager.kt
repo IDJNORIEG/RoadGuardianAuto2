@@ -34,19 +34,25 @@ class CameraManager(
     private var imageAnalyzer: ImageAnalysis? = null
     private var isCameraActive = false
     private var frameCount = 0
+    private var processingFrame = false
 
     companion object {
         private const val TAG = "CameraManager"
-        private const val FRAME_SKIP = 3 // Procesar 1 de cada 3 frames para rendimiento
+        private const val FRAME_SKIP = 2
+        private const val SEPARATOR = "============================================================"
     }
 
     fun initializeCamera() {
-        Log.d(TAG, "🎥 Inicializando cámara...")
+        Log.d(TAG, SEPARATOR)
+        Log.d(TAG, "📷 INICIALIZANDO CÁMARA")
+        Log.d(TAG, SEPARATOR)
+        
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
 
         cameraProviderFuture.addListener({
             try {
                 cameraProvider = cameraProviderFuture.get()
+                Log.d(TAG, "✅ CameraProvider obtenido")
                 startCamera()
             } catch (e: Exception) {
                 Log.e(TAG, "❌ Error obteniendo CameraProvider: ${e.message}", e)
@@ -62,7 +68,8 @@ class CameraManager(
                 return
             }
 
-            // Preview
+            Log.d(TAG, "📐 PreviewView: ${previewView.width}x${previewView.height}")
+
             val preview = Preview.Builder()
                 .setTargetRotation(previewView.display.rotation)
                 .build()
@@ -70,27 +77,27 @@ class CameraManager(
                     it.setSurfaceProvider(previewView.surfaceProvider)
                 }
 
-            // Image Analysis
+            Log.d(TAG, "✅ Preview configurado")
+
             imageAnalyzer = ImageAnalysis.Builder()
                 .setTargetResolution(android.util.Size(640, 480))
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
                 .build()
 
-            imageAnalyzer?.setAnalyzer(cameraExecutor) { imageProxy ->
-                processImageProxy(imageProxy)
+            imageAnalyzer?.setAnalyzer(cameraExecutor) { image ->
+                processImageProxy(image)
             }
 
-            // Camera selector
+            Log.d(TAG, "✅ ImageAnalyzer configurado")
+
             val cameraSelector = CameraSelector.Builder()
                 .requireLensFacing(CameraSelector.LENS_FACING_BACK)
                 .build()
 
-            // Unbind previous use cases
             cameraProvider.unbindAll()
 
-            // Bind use cases
-            cameraProvider.bindToLifecycle(
+            val camera = cameraProvider.bindToLifecycle(
                 lifecycleOwner,
                 cameraSelector,
                 preview,
@@ -98,7 +105,11 @@ class CameraManager(
             )
 
             isCameraActive = true
-            Log.i(TAG, "✅ Cámara iniciada correctamente")
+            
+            Log.i(TAG, SEPARATOR)
+            Log.i(TAG, "✅ CÁMARA INICIADA CORRECTAMENTE")
+            Log.i(TAG, "   Resolución: 640x480")
+            Log.i(TAG, SEPARATOR)
 
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error iniciando cámara: ${e.message}", e)
@@ -110,27 +121,36 @@ class CameraManager(
     private fun processImageProxy(imageProxy: ImageProxy) {
         frameCount++
         
-        // Saltar frames para mejorar rendimiento
+        if (processingFrame) {
+            imageProxy.close()
+            return
+        }
+        
         if (frameCount % FRAME_SKIP != 0) {
             imageProxy.close()
             return
         }
 
+        processingFrame = true
+
         try {
+            if (frameCount % 30 == 0) {
+                Log.d(TAG, "🎬 Frame $frameCount: ${imageProxy.width}x${imageProxy.height}")
+            }
+
             val bitmap = imageProxyToBitmap(imageProxy)
             
             if (bitmap == null) {
-                Log.w(TAG, "⚠️ Bitmap es null, saltando frame")
-                imageProxy.close()
+                Log.w(TAG, "⚠️ Bitmap null en frame $frameCount")
                 return
             }
 
-            Log.d(TAG, "🖼️ Procesando frame ${frameCount}: ${bitmap.width}x${bitmap.height}")
+            if (frameCount % 30 == 0) {
+                Log.d(TAG, "   Bitmap: ${bitmap.width}x${bitmap.height}")
+            }
 
-            // Detectar animales
             val detections = detectionManager.detectAnimals(bitmap)
 
-            // Actualizar UI en el hilo principal
             if (detections.isNotEmpty()) {
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
                     updateDetections(detections)
@@ -138,9 +158,10 @@ class CameraManager(
             }
 
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error procesando frame: ${e.message}", e)
+            Log.e(TAG, "❌ Error procesando frame $frameCount: ${e.message}", e)
         } finally {
             imageProxy.close()
+            processingFrame = false
         }
     }
 
@@ -179,7 +200,7 @@ class CameraManager(
             BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
             
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error convirtiendo ImageProxy a Bitmap: ${e.message}", e)
+            Log.e(TAG, "❌ Error convirtiendo a Bitmap: ${e.message}", e)
             null
         }
     }
@@ -190,33 +211,17 @@ class CameraManager(
             val viewHeight = previewView.height
             
             if (viewWidth <= 0 || viewHeight <= 0) {
-                Log.w(TAG, "⚠️ Vista no tiene dimensiones válidas")
+                Log.w(TAG, "⚠️ Vista sin dimensiones: ${viewWidth}x${viewHeight}")
                 return
             }
 
-            // Escalar detecciones al tamaño de la vista
-            val scaledDetections = detections.map { detection ->
-                detection.copy(
-                    boundingBox = android.graphics.RectF(
-                        detection.boundingBox.left * viewWidth / 640f,
-                        detection.boundingBox.top * viewHeight / 480f,
-                        detection.boundingBox.right * viewWidth / 640f,
-                        detection.boundingBox.bottom * viewHeight / 480f
-                    )
-                )
-            }
+            Log.d(TAG, "🎨 Actualizando overlay: ${detections.size} detecciones")
 
-            // Actualizar overlay
-            overlayView.updateDetections(
-                scaledDetections,
-                currentLanguageProvider.invoke()
-            )
-
-            // Callback
-            onDetectionsUpdate(scaledDetections)
+            overlayView.updateDetections(detections, currentLanguageProvider.invoke())
+            onDetectionsUpdate(detections)
 
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error actualizando detecciones: ${e.message}", e)
+            Log.e(TAG, "❌ Error actualizando UI: ${e.message}", e)
         }
     }
 
@@ -229,7 +234,7 @@ class CameraManager(
             overlayView.clearDetections()
             Log.i(TAG, "🛑 Cámara detenida")
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error al detener cámara: ${e.message}", e)
+            Log.e(TAG, "❌ Error deteniendo: ${e.message}", e)
         }
     }
 

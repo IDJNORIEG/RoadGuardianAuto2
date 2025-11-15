@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.RectF
 import android.util.Log
+import android.widget.Toast
 import com.roadguardian.auto.models.AnimalType
 import com.roadguardian.auto.models.Detection
 import org.tensorflow.lite.Interpreter
@@ -18,12 +19,14 @@ class DetectionManager(private val context: Context) {
     private var interpreter: Interpreter? = null
     private val inputSize = 640
     private var isModelLoaded = false
+    private var frameProcessed = 0
 
     companion object {
         private const val TAG = "DetectionManager"
         private const val CONFIDENCE_THRESHOLD = 0.25f
         private const val IOU_THRESHOLD = 0.45f
         private const val MODEL_FILE = "yolov8n.tflite"
+        private const val SEPARATOR = "============================================================"
     }
 
     init {
@@ -32,27 +35,82 @@ class DetectionManager(private val context: Context) {
 
     private fun loadModel() {
         try {
-            Log.d(TAG, "📦 Intentando cargar modelo: $MODEL_FILE")
-            val modelBuffer = FileUtil.loadMappedFile(context, MODEL_FILE)
+            Log.d(TAG, SEPARATOR)
+            Log.d(TAG, "🔍 DIAGNÓSTICO DE CARGA DEL MODELO")
+            Log.d(TAG, SEPARATOR)
+            
+            // Listar archivos en assets
+            val assetsList = context.assets.list("")
+            Log.d(TAG, "📁 Archivos en assets/: ${assetsList?.joinToString(", ")}")
+            
+            // Intentar abrir el modelo
+            Log.d(TAG, "📦 Intentando cargar: $MODEL_FILE")
+            
+            val modelBuffer = try {
+                FileUtil.loadMappedFile(context, MODEL_FILE)
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ ERROR: No se pudo cargar el archivo del modelo")
+                Log.e(TAG, "   Excepción: ${e.javaClass.simpleName}")
+                Log.e(TAG, "   Mensaje: ${e.message}")
+                
+                // Intentar buscar en subdirectorios
+                try {
+                    val subfolders = context.assets.list("")
+                    subfolders?.forEach { folder ->
+                        Log.d(TAG, "   Revisando carpeta: $folder")
+                        val files = context.assets.list(folder)
+                        files?.forEach { file ->
+                            Log.d(TAG, "      - $file")
+                        }
+                    }
+                } catch (ex: Exception) {
+                    Log.e(TAG, "Error listando assets: ${ex.message}")
+                }
+                
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    Toast.makeText(context, "ERROR: Modelo no encontrado en assets", Toast.LENGTH_LONG).show()
+                }
+                return
+            }
+            
+            Log.d(TAG, "✅ Archivo del modelo cargado: ${modelBuffer.capacity()} bytes")
+            Log.d(TAG, "📊 Tamaño: ${modelBuffer.capacity() / 1024 / 1024}MB")
             
             val options = Interpreter.Options().apply {
                 setNumThreads(4)
-                setUseNNAPI(false) // Desactivar NNAPI para mayor compatibilidad
+                setUseNNAPI(false)
             }
             
             interpreter = Interpreter(modelBuffer, options)
             
-            // Verificar dimensiones del modelo
-            val inputShape = interpreter?.getInputTensor(0)?.shape()
-            val outputShape = interpreter?.getOutputTensor(0)?.shape()
+            // Verificar forma del modelo
+            val inputTensor = interpreter?.getInputTensor(0)
+            val outputTensor = interpreter?.getOutputTensor(0)
             
-            Log.i(TAG, "✅ Modelo cargado correctamente")
-            Log.i(TAG, "📊 Input shape: ${inputShape?.contentToString()}")
-            Log.i(TAG, "📊 Output shape: ${outputShape?.contentToString()}")
+            val inputShape = inputTensor?.shape()
+            val outputShape = outputTensor?.shape()
+            
+            Log.d(TAG, "✅ Intérprete creado correctamente")
+            Log.d(TAG, "📊 Input shape: ${inputShape?.contentToString()}")
+            Log.d(TAG, "📊 Output shape: ${outputShape?.contentToString()}")
+            Log.d(TAG, "📊 Input dataType: ${inputTensor?.dataType()}")
+            Log.d(TAG, "📊 Output dataType: ${outputTensor?.dataType()}")
             
             isModelLoaded = true
+            
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                Toast.makeText(context, "✅ Modelo YOLOv8 cargado correctamente", Toast.LENGTH_SHORT).show()
+            }
+            
+            Log.d(TAG, SEPARATOR)
+            
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error cargando modelo: ${e.message}", e)
+            Log.e(TAG, "❌ ERROR CRÍTICO cargando modelo: ${e.message}", e)
+            
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                Toast.makeText(context, "ERROR: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+            
             isModelLoaded = false
         }
     }
@@ -61,13 +119,21 @@ class DetectionManager(private val context: Context) {
         bitmap: Bitmap,
         minConfidence: Float = CONFIDENCE_THRESHOLD
     ): List<Detection> {
+        frameProcessed++
+        
         if (!isModelLoaded || interpreter == null) {
-            Log.w(TAG, "⚠️ Modelo no cargado, retornando lista vacía")
+            if (frameProcessed % 30 == 0) {
+                Log.w(TAG, "⚠️ Modelo no cargado (frame $frameProcessed)")
+            }
             return emptyList()
         }
 
         return try {
             val startTime = System.currentTimeMillis()
+            
+            if (frameProcessed % 10 == 0) {
+                Log.d(TAG, "🖼️ Procesando frame $frameProcessed: ${bitmap.width}x${bitmap.height}")
+            }
             
             // Preprocesar imagen
             val resizedBitmap = Bitmap.createScaledBitmap(bitmap, inputSize, inputSize, true)
@@ -80,7 +146,10 @@ class DetectionManager(private val context: Context) {
             interpreter?.run(inputBuffer, outputArray)
             
             val inferenceTime = System.currentTimeMillis() - startTime
-            Log.d(TAG, "⏱️ Inferencia completada en ${inferenceTime}ms")
+            
+            if (frameProcessed % 10 == 0) {
+                Log.d(TAG, "⏱️ Inferencia: ${inferenceTime}ms")
+            }
             
             // Procesar resultados
             val detections = processOutput(
@@ -91,15 +160,22 @@ class DetectionManager(private val context: Context) {
             )
             
             if (detections.isNotEmpty()) {
-                Log.i(TAG, "🐾 Detectados ${detections.size} animales")
+                Log.i(TAG, SEPARATOR)
+                Log.i(TAG, "🐾 ¡DETECCIÓN! Frame $frameProcessed")
+                Log.i(TAG, "   Encontrados: ${detections.size} animales")
                 detections.forEach { det ->
-                    Log.d(TAG, "  - ${det.animal.getLocalizedName()}: ${det.getConfidencePercentage()}% a ${det.distance}m")
+                    Log.i(TAG, "   - ${det.animal.getLocalizedName()}: ${det.getConfidencePercentage()}% a ${det.distance}m")
+                }
+                Log.i(TAG, SEPARATOR)
+                
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    Toast.makeText(context, "🐾 ${detections.size} animal(es) detectado(s)", Toast.LENGTH_SHORT).show()
                 }
             }
             
             detections
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error en detección: ${e.message}", e)
+            Log.e(TAG, "❌ Error en detección (frame $frameProcessed): ${e.message}", e)
             emptyList()
         }
     }
@@ -116,7 +192,6 @@ class DetectionManager(private val context: Context) {
             for (j in 0 until inputSize) {
                 val value = intValues[pixel++]
                 
-                // Normalizar a [0, 1] dividiendo por 255
                 byteBuffer.putFloat(((value shr 16) and 0xFF) / 255.0f)
                 byteBuffer.putFloat(((value shr 8) and 0xFF) / 255.0f)
                 byteBuffer.putFloat((value and 0xFF) / 255.0f)
@@ -136,18 +211,14 @@ class DetectionManager(private val context: Context) {
         val detections = mutableListOf<Detection>()
         val animalIds = AnimalType.getAllIds()
 
-        // YOLOv8 formato: 8400 predicciones x 85 valores [x, y, w, h, conf, clases...]
         for (i in output.indices) {
             val prediction = output[i]
             
             if (prediction.size < 85) continue
             
-            // Confianza de objeto (índice 4)
             val objectness = prediction[4]
-            
             if (objectness < minConfidence) continue
 
-            // Encontrar la clase con mayor probabilidad
             var bestClassId = -1
             var bestScore = 0f
             
@@ -160,11 +231,8 @@ class DetectionManager(private val context: Context) {
             }
 
             val confidence = objectness * bestScore
-            
-            // Verificar si es un animal que detectamos
             if (confidence < minConfidence || bestClassId !in animalIds) continue
 
-            // Coordenadas del bounding box
             val cx = prediction[0]
             val cy = prediction[1]
             val w = prediction[2]
@@ -176,8 +244,7 @@ class DetectionManager(private val context: Context) {
             val bottom = (cy + h / 2f) * scaleY
 
             val boundingBox = RectF(left, top, right, bottom)
-            val bboxHeight = (bottom - top)
-            val distance = estimateDistance(bboxHeight)
+            val distance = estimateDistance(bottom - top)
 
             detections.add(
                 Detection(
@@ -193,8 +260,6 @@ class DetectionManager(private val context: Context) {
     }
 
     private fun estimateDistance(objectHeight: Float): Int {
-        // Estimación basada en altura del objeto en píxeles
-        // Valores calibrados para detección a distancia
         val normalized = max(0.1f, min(1f, objectHeight / 400f))
         val distance = 150 - (normalized * 140)
         return distance.toInt().coerceIn(10, 150)
@@ -250,9 +315,9 @@ class DetectionManager(private val context: Context) {
             interpreter?.close()
             interpreter = null
             isModelLoaded = false
-            Log.i(TAG, "🔒 DetectionManager liberado")
+            Log.i(TAG, "🔒 DetectionManager liberado (procesados $frameProcessed frames)")
         } catch (e: Exception) {
-            Log.e(TAG, "Error al liberar recursos: ${e.message}")
+            Log.e(TAG, "Error al liberar: ${e.message}")
         }
     }
 }
