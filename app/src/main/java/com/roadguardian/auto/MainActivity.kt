@@ -2,6 +2,7 @@ package com.roadguardian.auto
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.RectF
 import android.os.Bundle
 import android.util.Log
 import android.widget.Button
@@ -12,8 +13,10 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import com.roadguardian.auto.models.AnimalType
 import com.roadguardian.auto.models.Detection
 import com.roadguardian.auto.ui.DetectionOverlayView
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
@@ -42,9 +45,7 @@ class MainActivity : AppCompatActivity() {
         
         Log.i(TAG, "🚀 Iniciando MainActivity")
         
-        // Aplicar tema
         applyTheme()
-        
         setContentView(R.layout.activity_main)
 
         try {
@@ -53,10 +54,37 @@ class MainActivity : AppCompatActivity() {
             setupListeners()
             checkCameraPermission()
             
-            Log.i(TAG, "✅ MainActivity inicializada correctamente")
+            // Test visual del overlay después de 2 segundos
+            testOverlay()
+            
+            Log.i(TAG, "✅ MainActivity inicializada")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error en onCreate: ${e.message}", e)
             Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun testOverlay() {
+        lifecycleScope.launch {
+            delay(2000)
+            
+            Log.d(TAG, "🧪 Ejecutando test de overlay...")
+            
+            // Crear detección de prueba
+            val testDetection = Detection(
+                animal = AnimalType.DOG,
+                confidence = 0.85f,
+                distance = 45,
+                boundingBox = RectF(100f, 100f, 500f, 500f)
+            )
+            
+            overlayView.updateDetections(listOf(testDetection), "es")
+            
+            Toast.makeText(this@MainActivity, "Test: detección simulada mostrada", Toast.LENGTH_LONG).show()
+            
+            // Limpiar después de 3 segundos
+            delay(3000)
+            overlayView.clearDetections()
         }
     }
 
@@ -67,10 +95,8 @@ class MainActivity : AppCompatActivity() {
             
             if (isDarkMode) {
                 setTheme(R.style.Theme_RoadGuardianAuto_Dark)
-                Log.d(TAG, "🌙 Tema oscuro aplicado")
             } else {
                 setTheme(R.style.Theme_RoadGuardianAuto)
-                Log.d(TAG, "☀️ Tema claro aplicado")
             }
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error aplicando tema: ${e.message}")
@@ -85,7 +111,13 @@ class MainActivity : AppCompatActivity() {
         startButton = findViewById(R.id.startButton)
         settingsButton = findViewById(R.id.settingsButton)
         
+        // Asegurar que el overlay esté visible
+        overlayView.bringToFront()
+        overlayView.invalidate()
+        
         Log.d(TAG, "✅ Vistas inicializadas")
+        Log.d(TAG, "   PreviewView: ${previewView.width}x${previewView.height}")
+        Log.d(TAG, "   OverlayView: ${overlayView.width}x${overlayView.height}")
     }
 
     private fun initializeManagers() {
@@ -106,7 +138,6 @@ class MainActivity : AppCompatActivity() {
             }
         )
         
-        // Cargar idioma
         lifecycleScope.launch {
             settingsManager.settingsFlow.collect { settings ->
                 currentLanguage = settings.language
@@ -119,7 +150,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupListeners() {
         startButton.setOnClickListener {
-            Log.d(TAG, "🔘 Botón presionado: detecting=$detecting")
             if (!detecting) {
                 startDetection()
             } else {
@@ -128,17 +158,14 @@ class MainActivity : AppCompatActivity() {
         }
 
         settingsButton.setOnClickListener {
-            Log.d(TAG, "⚙️ Abriendo configuración")
             try {
                 val dialog = SettingsDialogFragment()
                 dialog.show(supportFragmentManager, "SettingsDialog")
             } catch (e: Exception) {
                 Log.e(TAG, "❌ Error mostrando diálogo: ${e.message}", e)
-                Toast.makeText(this, "Error abriendo configuración: ${e.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
-        
-        Log.d(TAG, "✅ Listeners configurados")
     }
 
     private fun checkCameraPermission() {
@@ -147,7 +174,7 @@ class MainActivity : AppCompatActivity() {
             statusText.text = getString(R.string.status_ready)
             Log.i(TAG, "✅ Permiso de cámara otorgado")
         } else {
-            Log.w(TAG, "⚠️ Solicitando permiso de cámara")
+            Log.w(TAG, "⚠️ Solicitando permiso")
             requestPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
@@ -156,11 +183,10 @@ class MainActivity : AppCompatActivity() {
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
             if (isGranted) {
                 statusText.text = getString(R.string.status_ready)
-                Log.i(TAG, "✅ Permiso concedido")
+                Toast.makeText(this, "Permiso otorgado", Toast.LENGTH_SHORT).show()
             } else {
                 statusText.text = getString(R.string.camera_permission_required)
-                Log.e(TAG, "❌ Permiso denegado")
-                Toast.makeText(this, "Se requiere permiso de cámara", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "Permiso requerido", Toast.LENGTH_LONG).show()
             }
         }
 
@@ -182,15 +208,14 @@ class MainActivity : AppCompatActivity() {
             counterText.text = "0"
             
             Toast.makeText(this, "Detección iniciada", Toast.LENGTH_SHORT).show()
-            Log.i(TAG, "✅ Detección iniciada")
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error iniciando: ${e.message}", e)
+            Log.e(TAG, "❌ Error: ${e.message}", e)
             Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 
     private fun stopDetection() {
-        Log.i(TAG, "⏹️ Deteniendo detección")
+        Log.i(TAG, "⏹️ Deteniendo")
         
         try {
             cameraManager.stopCamera()
@@ -202,9 +227,8 @@ class MainActivity : AppCompatActivity() {
             counterText.text = "0"
             
             Toast.makeText(this, "Detección detenida", Toast.LENGTH_SHORT).show()
-            Log.i(TAG, "✅ Detección detenida")
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error deteniendo: ${e.message}", e)
+            Log.e(TAG, "❌ Error: ${e.message}", e)
         }
     }
 
@@ -215,7 +239,6 @@ class MainActivity : AppCompatActivity() {
             
             Log.i(TAG, "📊 Total: $totalDetections")
             
-            // Vibrar en vez de sonido
             try {
                 val vibrator = getSystemService(VIBRATOR_SERVICE) as? android.os.Vibrator
                 vibrator?.vibrate(200)
@@ -227,8 +250,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        Log.w(TAG, "🔴 Destruyendo MainActivity")
-        
         try {
             detectionManager.release()
             if (detecting) {
@@ -241,24 +262,22 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
-        Log.d(TAG, "⏸️ Pausada")
         if (detecting) {
             try {
                 cameraManager.stopCamera()
             } catch (e: Exception) {
-                Log.e(TAG, "Error pausando: ${e.message}")
+                Log.e(TAG, "Error: ${e.message}")
             }
         }
     }
 
     override fun onResume() {
         super.onResume()
-        Log.d(TAG, "▶️ Resumida")
         if (detecting) {
             try {
                 cameraManager.initializeCamera()
             } catch (e: Exception) {
-                Log.e(TAG, "Error resumiendo: ${e.message}")
+                Log.e(TAG, "Error: ${e.message}")
             }
         }
     }
