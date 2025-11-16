@@ -31,7 +31,7 @@ class CameraManager(
 ) {
 
     private var cameraProvider: ProcessCameraProvider? = null
-    private var cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
+    private var cameraExecutor: ExecutorService? = null
     private var imageAnalyzer: ImageAnalysis? = null
     private var isCameraActive = false
     private var frameCount = 0
@@ -47,6 +47,12 @@ class CameraManager(
         Log.d(TAG, SEPARATOR)
         Log.d(TAG, "📷 INICIALIZANDO CÁMARA")
         Log.d(TAG, SEPARATOR)
+        
+        // Crear nuevo executor si no existe o fue cerrado
+        if (cameraExecutor == null || cameraExecutor?.isShutdown == true) {
+            cameraExecutor = Executors.newSingleThreadExecutor()
+            Log.d(TAG, "✅ Nuevo executor creado")
+        }
         
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
 
@@ -69,6 +75,10 @@ class CameraManager(
                 return
             }
 
+            // Desconectar todo antes de reconectar
+            cameraProvider.unbindAll()
+            Log.d(TAG, "🔄 Casos de uso anteriores desconectados")
+
             val preview = Preview.Builder()
                 .setTargetRotation(previewView.display.rotation)
                 .build()
@@ -84,7 +94,7 @@ class CameraManager(
                 .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
                 .build()
 
-            imageAnalyzer?.setAnalyzer(cameraExecutor) { image ->
+            imageAnalyzer?.setAnalyzer(cameraExecutor!!) { image ->
                 processImageProxy(image)
             }
 
@@ -94,8 +104,6 @@ class CameraManager(
                 .requireLensFacing(CameraSelector.LENS_FACING_BACK)
                 .build()
 
-            cameraProvider.unbindAll()
-
             cameraProvider.bindToLifecycle(
                 lifecycleOwner,
                 cameraSelector,
@@ -104,6 +112,8 @@ class CameraManager(
             )
 
             isCameraActive = true
+            frameCount = 0
+            processingFrame = false
             
             Log.i(TAG, SEPARATOR)
             Log.i(TAG, "✅ CÁMARA INICIADA CORRECTAMENTE")
@@ -117,6 +127,11 @@ class CameraManager(
 
     @SuppressLint("UnsafeOptInUsageError")
     private fun processImageProxy(imageProxy: ImageProxy) {
+        if (!isCameraActive) {
+            imageProxy.close()
+            return
+        }
+        
         frameCount++
         
         if (processingFrame) {
@@ -143,18 +158,23 @@ class CameraManager(
                 return
             }
 
-            // Detectar con el bitmap original (antes de escalar)
             val detections = detectionManager.detectAnimals(bitmap)
 
             if (detections.isNotEmpty()) {
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
-                    // Escalar las coordenadas de detección al tamaño de la vista
                     val scaledDetections = scaleDetectionsToView(
                         detections,
                         bitmap.width,
                         bitmap.height
                     )
                     updateDetections(scaledDetections)
+                }
+            } else {
+                // Limpiar overlay si no hay detecciones
+                if (frameCount % 10 == 0) {
+                    android.os.Handler(android.os.Looper.getMainLooper()).post {
+                        overlayView.clearDetections()
+                    }
                 }
             }
 
@@ -219,12 +239,8 @@ class CameraManager(
             return detections
         }
 
-        // Calcular escalas considerando el aspect ratio
         val scaleX = viewWidth / sourceWidth
         val scaleY = viewHeight / sourceHeight
-
-        Log.d(TAG, "📐 Escalado: source=${sourceWidth}x${sourceHeight}, view=${viewWidth.toInt()}x${viewHeight.toInt()}")
-        Log.d(TAG, "   Escalas: X=$scaleX, Y=$scaleY")
 
         return detections.map { detection ->
             val box = detection.boundingBox
@@ -236,20 +252,14 @@ class CameraManager(
                 box.bottom * scaleY
             )
             
-            Log.d(TAG, "   Original: [${box.left}, ${box.top}, ${box.right}, ${box.bottom}]")
-            Log.d(TAG, "   Escalado: [${scaledBox.left}, ${scaledBox.top}, ${scaledBox.right}, ${scaledBox.bottom}]")
-            
             detection.copy(boundingBox = scaledBox)
         }
     }
 
     private fun updateDetections(detections: List<Detection>) {
         try {
-            Log.d(TAG, "🎨 Actualizando overlay: ${detections.size} detecciones")
-
             overlayView.updateDetections(detections, currentLanguageProvider.invoke())
             onDetectionsUpdate(detections)
-
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error actualizando UI: ${e.message}", e)
         }
@@ -257,12 +267,25 @@ class CameraManager(
 
     fun stopCamera() {
         try {
-            cameraProvider?.unbindAll()
-            cameraExecutor.shutdown()
+            Log.i(TAG, "🛑 Deteniendo cámara...")
+            
             isCameraActive = false
-            frameCount = 0
+            
+            // Desconectar casos de uso
+            cameraProvider?.unbindAll()
+            
+            // Limpiar overlay
             overlayView.clearDetections()
-            Log.i(TAG, "🛑 Cámara detenida")
+            
+            // Cerrar executor
+            cameraExecutor?.shutdown()
+            cameraExecutor = null
+            
+            // Resetear variables
+            frameCount = 0
+            processingFrame = false
+            
+            Log.i(TAG, "✅ Cámara detenida completamente")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error deteniendo: ${e.message}", e)
         }

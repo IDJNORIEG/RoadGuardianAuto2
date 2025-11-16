@@ -11,61 +11,63 @@
         android:layout_height="60dp"
         android:background="@color/surface_dark"
         android:orientation="horizontal"
-        android:padding="8dp"
+        android:padding="6dp"
         android:gravity="center_vertical">
 
-        <!-- Botón de inicio (más pequeño) -->
+        <!-- Botón de inicio (150dp) -->
         <Button
             android:id="@+id/startButton"
-            android:layout_width="140dp"
+            android:layout_width="150dp"
             android:layout_height="match_parent"
-            android:layout_margin="4dp"
+            android:layout_margin="3dp"
             android:backgroundTint="@color/primary"
             android:text="@string/start_detection"
-            android:textSize="12sp"
-            android:textColor="@color/text_white"/>
+            android:textSize="11sp"
+            android:textColor="@color/text_white"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"/>
 
         <!-- Estado -->
         <TextView
             android:id="@+id/statusText"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_margin="4dp"
+            android:layout_margin="3dp"
             android:layout_weight="1"
             android:gravity="center"
             android:text="@string/status_ready"
-            android:textSize="14sp"
+            android:textSize="13sp"
             android:textColor="@color/primary"/>
 
         <!-- Contador -->
         <TextView
             android:id="@+id/counterText"
-            android:layout_width="50dp"
+            android:layout_width="45dp"
             android:layout_height="match_parent"
-            android:layout_margin="4dp"
+            android:layout_margin="3dp"
             android:gravity="center"
             android:text="0"
-            android:textSize="20sp"
+            android:textSize="18sp"
             android:textStyle="bold"
             android:textColor="@color/accent"/>
 
         <!-- Selector de idioma -->
         <Spinner
             android:id="@+id/languageSpinner"
-            android:layout_width="100dp"
+            android:layout_width="95dp"
             android:layout_height="match_parent"
-            android:layout_margin="4dp"
+            android:layout_margin="3dp"
             android:background="@android:drawable/btn_dropdown"
             android:spinnerMode="dropdown"/>
 
         <!-- Botón de ajustes -->
         <Button
             android:id="@+id/settingsButton"
-            android:layout_width="50dp"
+            android:layout_width="48dp"
             android:layout_height="match_parent"
-            android:layout_margin="4dp"
+            android:layout_margin="3dp"
             android:text="⚙"
-            android:textSize="20sp"/>
+            android:textSize="18sp"/>
     </LinearLayout>
 
     <!-- Contenedor de cámara y overlay -->

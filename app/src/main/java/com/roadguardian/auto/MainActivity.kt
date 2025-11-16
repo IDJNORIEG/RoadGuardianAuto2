@@ -8,6 +8,7 @@ import android.media.SoundPool
 import android.os.Bundle
 import android.util.Log
 import android.view.View
+import android.view.WindowManager
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -66,6 +67,10 @@ class MainActivity : AppCompatActivity() {
         
         Log.i(TAG, "🚀 Iniciando MainActivity")
         
+        // Mantener pantalla encendida
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        Log.d(TAG, "💡 Pantalla configurada para permanecer encendida")
+        
         applyTheme()
         setContentView(R.layout.activity_main)
 
@@ -99,7 +104,7 @@ class MainActivity : AppCompatActivity() {
 
             try {
                 alertSoundId = soundPool?.load(this, R.raw.alert_sound, 1) ?: 0
-                Log.d(TAG, "🔊 Sonido cargado: ID=$alertSoundId")
+                Log.d(TAG, "🔊 Sonido cargado")
             } catch (e: Exception) {
                 Log.w(TAG, "⚠️ No se pudo cargar alert_sound.mp3")
             }
@@ -111,18 +116,13 @@ class MainActivity : AppCompatActivity() {
     private fun testOverlay() {
         lifecycleScope.launch {
             delay(2000)
-            
-            Log.d(TAG, "🧪 Test de overlay...")
-            
             val testDetection = Detection(
                 animal = AnimalType.DOG,
                 confidence = 0.85f,
                 distance = 45,
                 boundingBox = RectF(100f, 100f, 500f, 500f)
             )
-            
             overlayView.updateDetections(listOf(testDetection), currentLanguage)
-            
             delay(3000)
             overlayView.clearDetections()
         }
@@ -153,7 +153,6 @@ class MainActivity : AppCompatActivity() {
         languageSpinner = findViewById(R.id.languageSpinner)
         
         overlayView.bringToFront()
-        overlayView.invalidate()
         
         Log.d(TAG, "✅ Vistas inicializadas")
     }
@@ -168,16 +167,16 @@ class MainActivity : AppCompatActivity() {
             adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
             languageSpinner.adapter = adapter
             
-            // Cargar idioma guardado
             lifecycleScope.launch {
                 val settings = settingsManager.settingsFlow.first()
-                val index = LANGUAGE_CODES.indexOf(settings.language)
+                currentLanguage = settings.language
+                val index = LANGUAGE_CODES.indexOf(currentLanguage)
                 if (index >= 0) {
                     languageSpinner.setSelection(index)
                 }
+                updateUILanguage()
             }
             
-            // Listener para cambios
             var isFirstSelection = true
             languageSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
                 override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
@@ -187,13 +186,14 @@ class MainActivity : AppCompatActivity() {
                     }
                     
                     if (position >= 0 && position < LANGUAGE_CODES.size) {
-                        val langCode = LANGUAGE_CODES[position]
-                        currentLanguage = langCode
+                        currentLanguage = LANGUAGE_CODES[position]
                         
                         lifecycleScope.launch {
-                            settingsManager.updateLanguage(langCode)
-                            Log.d(TAG, "🌍 Idioma: $langCode")
+                            settingsManager.updateLanguage(currentLanguage)
                         }
+                        
+                        updateUILanguage()
+                        Log.d(TAG, "🌍 Idioma: $currentLanguage")
                     }
                 }
 
@@ -203,6 +203,22 @@ class MainActivity : AppCompatActivity() {
             Log.d(TAG, "✅ Selector de idioma configurado")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error configurando selector: ${e.message}")
+        }
+    }
+
+    private fun updateUILanguage() {
+        try {
+            if (detecting) {
+                startButton.text = TranslationsManager.getStopDetection(currentLanguage)
+                statusText.text = TranslationsManager.getStatusDetecting(currentLanguage)
+            } else {
+                startButton.text = TranslationsManager.getStartDetection(currentLanguage)
+                statusText.text = TranslationsManager.getStatusReady(currentLanguage)
+            }
+            
+            Log.d(TAG, "✅ UI actualizada al idioma: $currentLanguage")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error actualizando idioma UI: ${e.message}")
         }
     }
 
@@ -226,9 +242,7 @@ class MainActivity : AppCompatActivity() {
         
         lifecycleScope.launch {
             settingsManager.settingsFlow.collect { settings ->
-                currentLanguage = settings.language
                 soundEnabled = settings.soundEnabled
-                Log.d(TAG, "⚙️ Config: idioma=$currentLanguage, sonido=$soundEnabled")
             }
         }
         
@@ -258,7 +272,7 @@ class MainActivity : AppCompatActivity() {
     private fun checkCameraPermission() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
             == PackageManager.PERMISSION_GRANTED) {
-            statusText.text = getString(R.string.status_ready)
+            statusText.text = TranslationsManager.getStatusReady(currentLanguage)
             Log.i(TAG, "✅ Permiso de cámara otorgado")
         } else {
             Log.w(TAG, "⚠️ Solicitando permiso")
@@ -269,32 +283,35 @@ class MainActivity : AppCompatActivity() {
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
             if (isGranted) {
-                statusText.text = getString(R.string.status_ready)
+                statusText.text = TranslationsManager.getStatusReady(currentLanguage)
                 Toast.makeText(this, "Permiso otorgado", Toast.LENGTH_SHORT).show()
             } else {
-                statusText.text = getString(R.string.camera_permission_required)
-                Toast.makeText(this, "Permiso requerido", Toast.LENGTH_LONG).show()
+                statusText.text = TranslationsManager.getCameraPermissionRequired(currentLanguage)
+                Toast.makeText(this, TranslationsManager.getCameraPermissionRequired(currentLanguage), Toast.LENGTH_LONG).show()
             }
         }
 
     private fun startDetection() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
             != PackageManager.PERMISSION_GRANTED) {
-            Toast.makeText(this, "Permiso de cámara requerido", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, TranslationsManager.getCameraPermissionRequired(currentLanguage), Toast.LENGTH_SHORT).show()
             return
         }
         
         Log.i(TAG, "▶️ Iniciando detección")
         
         try {
+            // Limpiar overlay antes de iniciar
+            overlayView.clearDetections()
+            
             cameraManager.initializeCamera()
             detecting = true
-            statusText.text = getString(R.string.status_detecting)
-            startButton.text = getString(R.string.stop_detection)
+            statusText.text = TranslationsManager.getStatusDetecting(currentLanguage)
+            startButton.text = TranslationsManager.getStopDetection(currentLanguage)
             totalDetections = 0
             counterText.text = "0"
             
-            Toast.makeText(this, "Detección iniciada", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, TranslationsManager.getDetectionStarted(currentLanguage), Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error: ${e.message}", e)
             Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_LONG).show()
@@ -305,15 +322,28 @@ class MainActivity : AppCompatActivity() {
         Log.i(TAG, "⏹️ Deteniendo")
         
         try {
+            // Detener cámara primero
             cameraManager.stopCamera()
-            detecting = false
-            statusText.text = getString(R.string.status_ready)
-            startButton.text = getString(R.string.start_detection)
-            overlayView.clearDetections()
-            totalDetections = 0
-            counterText.text = "0"
             
-            Toast.makeText(this, "Detección detenida", Toast.LENGTH_SHORT).show()
+            // Dar tiempo para que se detenga completamente
+            lifecycleScope.launch {
+                delay(200)
+                
+                // Limpiar completamente la UI
+                runOnUiThread {
+                    detecting = false
+                    statusText.text = TranslationsManager.getStatusReady(currentLanguage)
+                    startButton.text = TranslationsManager.getStartDetection(currentLanguage)
+                    overlayView.clearDetections()
+                    totalDetections = 0
+                    counterText.text = "0"
+                    
+                    // Forzar redibujo del preview para limpiar imagen residual
+                    previewView.invalidate()
+                }
+                
+                Toast.makeText(this@MainActivity, TranslationsManager.getDetectionStopped(currentLanguage), Toast.LENGTH_SHORT).show()
+            }
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error: ${e.message}", e)
         }
@@ -368,6 +398,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        
+        // Quitar flag de pantalla encendida
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        
         try {
             soundPool?.release()
             soundPool = null
@@ -382,13 +416,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
-        if (detecting) {
-            try {
-                cameraManager.stopCamera()
-            } catch (e: Exception) {
-                Log.e(TAG, "Error: ${e.message}")
-            }
-        }
+        // No detener cámara en onPause para mantener detección activa
+        Log.d(TAG, "⏸️ Activity pausada")
     }
 
     override fun onResume() {
@@ -398,14 +427,9 @@ class MainActivity : AppCompatActivity() {
             val settings = settingsManager.settingsFlow.first()
             soundEnabled = settings.soundEnabled
             currentLanguage = settings.language
+            updateUILanguage()
         }
         
-        if (detecting) {
-            try {
-                cameraManager.initializeCamera()
-            } catch (e: Exception) {
-                Log.e(TAG, "Error: ${e.message}")
-            }
-        }
+        Log.d(TAG, "▶️ Activity resumida")
     }
 }
