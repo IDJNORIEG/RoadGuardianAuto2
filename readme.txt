@@ -3,7 +3,7 @@
 
 ## Descripción
 
-Este repositorio contiene el código fuente de RoadGuardianAuto2. El proyecto está pensado para ofrecer funcionalidades de seguridad, monitoreo o gestión en el contexto de vías, sensores o sistemas automatizados relacionados con carreteras, aunque no se encontró una descripción detallada en la metadata pública del repositorio.
+Este repositorio contiene el código fuente de RoadGuardianAuto2. El proyecto está pensado para ofrecer funcionalidades de seguridad, monitoreo o gestión en el contexto de vías, sensores o sistemas automatizados relacionados con carreteras alrededor del mundo.
 
 ## Características principales
 
