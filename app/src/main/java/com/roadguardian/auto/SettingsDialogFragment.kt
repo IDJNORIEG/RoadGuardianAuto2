@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import android.widget.*
 import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.lifecycleScope
@@ -18,12 +19,13 @@ class SettingsDialogFragment : DialogFragment() {
     private lateinit var settingsManager: SettingsManager
     private var currentLanguage = "es"
     
-    // Referencias a labels
+    // Referencias a todos los elementos traducibles
     private var sensitivityLabelView: TextView? = null
     private var confidenceLabelView: TextView? = null
     private var soundLabelView: TextView? = null
     private var themeLabelView: TextView? = null
     private var languageLabelView: TextView? = null
+    private var dialogInstance: AlertDialog? = null
     
     companion object {
         private const val TAG = "SettingsDialog"
@@ -47,65 +49,114 @@ class SettingsDialogFragment : DialogFragment() {
             settingsManager = SettingsManager(requireContext())
             lifecycleScope.launch {
                 currentLanguage = settingsManager.settingsFlow.first().language
+                Log.d(TAG, "✅ Idioma cargado: $currentLanguage")
             }
             Log.d(TAG, "✅ SettingsManager creado")
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error: ${e.message}", e)
+            Log.e(TAG, "❌ Error en onCreate: ${e.message}", e)
         }
     }
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
-        Log.d(TAG, "📱 Creando diálogo...")
+        Log.d(TAG, "📱 Creando diálogo de configuración...")
         
         return try {
-            val inflater = LayoutInflater.from(requireContext())
+            val context = requireContext()
+            val inflater = LayoutInflater.from(context)
+            
+            // Inflar el layout
             val view = inflater.inflate(R.layout.dialog_settings, null)
             
+            // Configurar vistas
             setupViews(view)
             
-            AlertDialog.Builder(requireContext())
-                .setTitle(TranslationsManager.getSettings(currentLanguage))
-                .setView(view)
-                .setPositiveButton(TranslationsManager.getAccept(currentLanguage)) { dialog, _ ->
-                    Log.d(TAG, "✅ Configuración guardada")
-                    dialog.dismiss()
-                }
-                .setNegativeButton(TranslationsManager.getCancel(currentLanguage)) { dialog, _ ->
-                    Log.d(TAG, "❌ Configuración cancelada")
-                    dialog.dismiss()
-                }
-                .create()
+            // Crear el diálogo
+            val builder = AlertDialog.Builder(context)
+            builder.setTitle(TranslationsManager.getSettings(currentLanguage))
+            builder.setView(view)
+            builder.setPositiveButton(TranslationsManager.getAccept(currentLanguage)) { dialog, _ ->
+                Log.d(TAG, "✅ Configuración guardada")
+                dialog.dismiss()
+            }
+            builder.setNegativeButton(TranslationsManager.getCancel(currentLanguage)) { dialog, _ ->
+                Log.d(TAG, "❌ Configuración cancelada")
+                dialog.dismiss()
+            }
+            
+            val dialog = builder.create()
+            dialogInstance = dialog
+            
+            Log.d(TAG, "✅ Diálogo creado exitosamente")
+            dialog
+            
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error: ${e.message}", e)
+            Log.e(TAG, "❌ Error crítico creando diálogo: ${e.message}", e)
+            e.printStackTrace()
+            
+            // Diálogo de error como fallback
             AlertDialog.Builder(requireContext())
                 .setTitle("Error")
-                .setMessage("No se pudo abrir la configuración: ${e.message}")
-                .setPositiveButton("OK", null)
+                .setMessage("No se pudo abrir la configuración.\n\nDetalle: ${e.message}\n\nLínea: ${e.stackTrace.firstOrNull()?.lineNumber}")
+                .setPositiveButton("OK") { dialog, _ -> 
+                    dialog.dismiss()
+                    dismiss()
+                }
                 .create()
         }
     }
 
     private fun setupViews(view: View) {
         try {
-            val sensitivitySeek = view.findViewById<SeekBar>(R.id.sensitivitySeek)
-            val confidenceSeek = view.findViewById<SeekBar>(R.id.confidenceSeek)
-            val soundSwitch = view.findViewById<Switch>(R.id.soundSwitch)
-            val themeSwitch = view.findViewById<Switch>(R.id.themeSwitch)
-            val languageSpinner = view.findViewById<Spinner>(R.id.languageSpinner)
-            val sensitivityLabel = view.findViewById<TextView>(R.id.sensitivityValue)
-            val confidenceLabel = view.findViewById<TextView>(R.id.confidenceValue)
+            Log.d(TAG, "🔧 Configurando vistas...")
             
-            // Referencias a los labels traducibles
+            // Buscar vistas con verificación
+            val sensitivitySeek = view.findViewById<SeekBar>(R.id.sensitivitySeek) ?: run {
+                Log.e(TAG, "❌ No se encontró sensitivitySeek")
+                return
+            }
+            
+            val confidenceSeek = view.findViewById<SeekBar>(R.id.confidenceSeek) ?: run {
+                Log.e(TAG, "❌ No se encontró confidenceSeek")
+                return
+            }
+            
+            val soundSwitch = view.findViewById<Switch>(R.id.soundSwitch) ?: run {
+                Log.e(TAG, "❌ No se encontró soundSwitch")
+                return
+            }
+            
+            val themeSwitch = view.findViewById<Switch>(R.id.themeSwitch) ?: run {
+                Log.e(TAG, "❌ No se encontró themeSwitch")
+                return
+            }
+            
+            val languageSpinner = view.findViewById<Spinner>(R.id.languageSpinner) ?: run {
+                Log.e(TAG, "❌ No se encontró languageSpinner")
+                return
+            }
+            
+            val sensitivityLabel = view.findViewById<TextView>(R.id.sensitivityValue) ?: run {
+                Log.e(TAG, "❌ No se encontró sensitivityValue")
+                return
+            }
+            
+            val confidenceLabel = view.findViewById<TextView>(R.id.confidenceValue) ?: run {
+                Log.e(TAG, "❌ No se encontró confidenceValue")
+                return
+            }
+            
+            // Guardar referencias a labels traducibles
             sensitivityLabelView = view.findViewById(R.id.sensitivityLabel)
             confidenceLabelView = view.findViewById(R.id.confidenceLabel)
             soundLabelView = view.findViewById(R.id.soundLabel)
             themeLabelView = view.findViewById(R.id.themeLabel)
             languageLabelView = view.findViewById(R.id.languageLabel)
 
-            Log.d(TAG, "✅ Vistas encontradas")
+            Log.d(TAG, "✅ Todas las vistas encontradas")
 
+            // Configurar componentes
             setupLanguageSpinner(languageSpinner)
-            updateLabels() // Actualizar labels con idioma actual
+            updateAllLabels()
             
             loadSettings(
                 sensitivitySeek, confidenceSeek, soundSwitch, 
@@ -116,19 +167,31 @@ class SettingsDialogFragment : DialogFragment() {
                 sensitivitySeek, confidenceSeek, soundSwitch,
                 themeSwitch, languageSpinner, sensitivityLabel, confidenceLabel
             )
+            
+            Log.d(TAG, "✅ Vistas configuradas correctamente")
 
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error: ${e.message}", e)
+            Log.e(TAG, "❌ Error configurando vistas: ${e.message}", e)
+            e.printStackTrace()
         }
     }
 
-    private fun updateLabels() {
+    private fun updateAllLabels() {
         try {
             sensitivityLabelView?.text = TranslationsManager.getSensitivity(currentLanguage)
             confidenceLabelView?.text = TranslationsManager.getConfidence(currentLanguage)
             soundLabelView?.text = TranslationsManager.getSoundAlert(currentLanguage)
             themeLabelView?.text = TranslationsManager.getDarkMode(currentLanguage)
             languageLabelView?.text = TranslationsManager.getLanguage(currentLanguage)
+            
+            // Actualizar título y botones del diálogo
+            dialogInstance?.let { dialog ->
+                dialog.setTitle(TranslationsManager.getSettings(currentLanguage))
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.text = 
+                    TranslationsManager.getAccept(currentLanguage)
+                dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.text = 
+                    TranslationsManager.getCancel(currentLanguage)
+            }
             
             Log.d(TAG, "✅ Labels actualizados a: $currentLanguage")
         } catch (e: Exception) {
@@ -146,9 +209,9 @@ class SettingsDialogFragment : DialogFragment() {
             adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
             spinner.adapter = adapter
             
-            Log.d(TAG, "✅ Spinner configurado")
+            Log.d(TAG, "✅ Spinner de idioma configurado")
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error: ${e.message}", e)
+            Log.e(TAG, "❌ Error configurando spinner: ${e.message}", e)
         }
     }
 
@@ -185,9 +248,9 @@ class SettingsDialogFragment : DialogFragment() {
                     languageSpinner.setSelection(langIndex)
                 }
 
-                Log.d(TAG, "✅ Configuración cargada")
+                Log.d(TAG, "✅ Configuración cargada: sens=$sensProgress%, conf=$confProgress%, sound=${settings.soundEnabled}, lang=$currentLanguage")
             } catch (e: Exception) {
-                Log.e(TAG, "❌ Error: ${e.message}", e)
+                Log.e(TAG, "❌ Error cargando configuración: ${e.message}", e)
             }
         }
     }
@@ -211,8 +274,9 @@ class SettingsDialogFragment : DialogFragment() {
                         lifecycleScope.launch {
                             try {
                                 settingsManager.updateSensitivity(value)
+                                Log.d(TAG, "📊 Sensibilidad: $progress%")
                             } catch (e: Exception) {
-                                Log.e(TAG, "❌ Error: ${e.message}")
+                                Log.e(TAG, "❌ Error actualizando sensibilidad: ${e.message}")
                             }
                         }
                     }
@@ -230,8 +294,9 @@ class SettingsDialogFragment : DialogFragment() {
                         lifecycleScope.launch {
                             try {
                                 settingsManager.updateMinConfidence(value)
+                                Log.d(TAG, "📊 Confianza: $progress%")
                             } catch (e: Exception) {
-                                Log.e(TAG, "❌ Error: ${e.message}")
+                                Log.e(TAG, "❌ Error actualizando confianza: ${e.message}")
                             }
                         }
                     }
@@ -251,6 +316,7 @@ class SettingsDialogFragment : DialogFragment() {
                             TranslationsManager.getSoundDisabled(currentLanguage)
                         }
                         Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
+                        Log.d(TAG, "🔊 Sonido: $isChecked")
                     } catch (e: Exception) {
                         Log.e(TAG, "❌ Error: ${e.message}")
                     }
@@ -268,6 +334,7 @@ class SettingsDialogFragment : DialogFragment() {
                         TranslationsManager.getRestartToApplyTheme(currentLanguage),
                         Toast.LENGTH_SHORT
                     ).show()
+                    Log.d(TAG, "🎨 Tema oscuro: $isChecked")
                 } catch (e: Exception) {
                     Log.e(TAG, "❌ Error: ${e.message}")
                 }
@@ -290,19 +357,13 @@ class SettingsDialogFragment : DialogFragment() {
                         lifecycleScope.launch {
                             try {
                                 settingsManager.updateLanguage(langCode)
-                                Toast.makeText(requireContext(), langName, Toast.LENGTH_SHORT).show()
+                                updateAllLabels()
                                 
-                                // Actualizar labels del diálogo
-                                updateLabels()
+                                Toast.makeText(requireContext(), 
+                                    "${TranslationsManager.getLanguage(currentLanguage)}: $langName", 
+                                    Toast.LENGTH_SHORT).show()
                                 
-                                // Actualizar título y botones
-                                (dialog as? AlertDialog)?.let { alertDialog ->
-                                    alertDialog.setTitle(TranslationsManager.getSettings(currentLanguage))
-                                    alertDialog.getButton(AlertDialog.BUTTON_POSITIVE)?.text = 
-                                        TranslationsManager.getAccept(currentLanguage)
-                                    alertDialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.text = 
-                                        TranslationsManager.getCancel(currentLanguage)
-                                }
+                                Log.d(TAG, "🌍 Idioma: $currentLanguage")
                             } catch (e: Exception) {
                                 Log.e(TAG, "❌ Error: ${e.message}")
                             }
@@ -315,7 +376,13 @@ class SettingsDialogFragment : DialogFragment() {
 
             Log.d(TAG, "✅ Listeners configurados")
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error: ${e.message}", e)
+            Log.e(TAG, "❌ Error configurando listeners: ${e.message}", e)
         }
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        dialogInstance = null
+        Log.d(TAG, "🗑️ Vista del diálogo destruida")
     }
 }

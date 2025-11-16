@@ -23,6 +23,23 @@
         <item name="android:statusBarColor">@color/background_dark</item>
         <item name="android:navigationBarColor">@color/background_dark</item>
         <item name="android:windowLightStatusBar" tools:targetApi="23">false</item>
+
+        <!-- Estilo de diálogo -->
+        <item name="alertDialogTheme">@style/Theme_RoadGuardianAuto_Dialog_Dark</item>
+    </style>
+
+    <!-- Tema para diálogos en modo oscuro -->
+    <style name="Theme_RoadGuardianAuto_Dialog_Dark" parent="Theme.MaterialComponents.Dialog.Alert">
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorSecondary">@color/green_accent</item>
+        <item name="android:windowBackground">@color/surface_dark</item>
+        <item name="android:textColorPrimary">@color/text_white</item>
+        <item name="android:textColorSecondary">@color/text_gray</item>
+        <item name="colorSurface">@color/surface_dark</item>
+        
+        <!-- Dimensiones del diálogo -->
+        <item name="android:windowMinWidthMajor">90%</item>
+        <item name="android:windowMinWidthMinor">90%</item>
     </style>
 
 </resources>
