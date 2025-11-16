@@ -39,7 +39,3 @@ Actualmente, este repositorio no tiene licencia definida en GitHub. Puedes agreg
 ## Autor
 
 Desarrollado y mantenido por [IDJNORIEG](https://github.com/IDJNORIEG).
-
----
-
-¿Quieres personalizar más el README? Si me das una breve descripción de lo que hace tu app, puedo generar una versión más precisa y atractiva.
