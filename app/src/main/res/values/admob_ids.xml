@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ⚠️ IMPORTANTE: Reemplaza estos IDs con tus IDs reales de AdMob -->
+    
+    <!-- ID de la aplicación (va en AndroidManifest.xml) -->
+    <!-- Formato: ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY -->
+    <string name="admob_app_id" translatable="false">ca-app-pub-8690577445002348~5948181462</string>
+    
+    <!-- ID del Banner -->
+    <string name="admob_banner_id" translatable="false">ca-app-pub-3940256099942544/6300978111</string>
+    
+    <!-- ID del Intersticial -->
+    <string name="admob_interstitial_id" translatable="false">ca-app-pub-3940256099942544/1033173712</string>
+    
+    <!-- 
+    ============================================
+    CÓMO OBTENER TUS IDs REALES DE ADMOB:
+    ============================================
+    
+    1. Ve a: https://apps.admob.com/
+    2. Inicia sesión con tu cuenta de Google
+    3. Click en "Apps" → "Add App"
+    4. Registra tu app (nombre: RoadGuardian Auto)
+    5. Copia el "App ID" (ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY)
+    6. Click en "Ad units" → "Add ad unit"
+    7. Crea un "Banner" y copia su ID
+    8. Crea un "Interstitial" y copia su ID
+    9. Reemplaza los IDs en este archivo
+    
+    ⚠️ NOTA: Los IDs de arriba son IDs DE PRUEBA de Google
+    Funcionan para testing pero NO generan ingresos reales.
+    -->
+</resources>

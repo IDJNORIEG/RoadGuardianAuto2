@@ -2,7 +2,6 @@ package com.roadguardian.auto
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.graphics.RectF
 import android.media.AudioAttributes
 import android.media.SoundPool
 import android.os.Bundle
@@ -15,7 +14,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
-import com.roadguardian.auto.models.AnimalType
+import com.google.android.gms.ads.AdView
 import com.roadguardian.auto.models.Detection
 import com.roadguardian.auto.ui.DetectionOverlayView
 import kotlinx.coroutines.delay
@@ -31,10 +30,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var startButton: Button
     private lateinit var settingsButton: Button
     private lateinit var languageSpinner: Spinner
+    private lateinit var adView: AdView
 
     private lateinit var cameraManager: CameraManager
     private lateinit var detectionManager: DetectionManager
     private lateinit var settingsManager: SettingsManager
+    private lateinit var adManager: AdManager
 
     private var soundPool: SoundPool? = null
     private var alertSoundId: Int = 0
@@ -78,12 +79,18 @@ class MainActivity : AppCompatActivity() {
             initializeViews()
             initializeManagers()
             initializeSoundPool()
+            initializeAds()
             setupListeners()
             setupLanguageSpinner()
             checkCameraPermission()
-            testOverlay()
             
-            Log.i(TAG, "✅ MainActivity inicializada")
+            // Mostrar anuncio de bienvenida después de 2 segundos
+            lifecycleScope.launch {
+                delay(2000)
+                adManager.showWelcomeAd(this@MainActivity)
+            }
+            
+            Log.i(TAG, "✅ MainActivity inicializada completamente")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error en onCreate: ${e.message}", e)
             Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_LONG).show()
@@ -113,18 +120,30 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun testOverlay() {
-        lifecycleScope.launch {
-            delay(2000)
-            val testDetection = Detection(
-                animal = AnimalType.DOG,
-                confidence = 0.85f,
-                distance = 45,
-                boundingBox = RectF(100f, 100f, 500f, 500f)
-            )
-            overlayView.updateDetections(listOf(testDetection), currentLanguage)
-            delay(3000)
-            overlayView.clearDetections()
+    private fun initializeAds() {
+        try {
+            Log.d(TAG, "📢 Inicializando sistema de anuncios...")
+            
+            // Crear AdManager
+            adManager = AdManager(this)
+            adManager.initialize()
+            
+            // Obtener y configurar AdView
+            adView = findViewById(R.id.adView)
+            adView.apply {
+                setAdSize(com.google.android.gms.ads.AdSize.BANNER)
+                // ⚠️ ID de prueba - Reemplaza con tu ID real de producción
+                adUnitId = "ca-app-pub-8690577445002348/8703720200"
+                // Para producción: adUnitId = "TU_BANNER_ID_REAL"
+            }
+            
+            // Cargar banner
+            adManager.loadBanner(adView)
+            
+            Log.d(TAG, "✅ Sistema de anuncios inicializado correctamente")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error inicializando ads: ${e.message}", e)
+            // La app continúa funcionando sin anuncios
         }
     }
 
@@ -193,7 +212,7 @@ class MainActivity : AppCompatActivity() {
                         }
                         
                         updateUILanguage()
-                        Log.d(TAG, "🌍 Idioma: $currentLanguage")
+                        Log.d(TAG, "🌍 Idioma cambiado a: $currentLanguage")
                     }
                 }
 
@@ -275,7 +294,7 @@ class MainActivity : AppCompatActivity() {
             statusText.text = TranslationsManager.getStatusReady(currentLanguage)
             Log.i(TAG, "✅ Permiso de cámara otorgado")
         } else {
-            Log.w(TAG, "⚠️ Solicitando permiso")
+            Log.w(TAG, "⚠️ Solicitando permiso de cámara")
             requestPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
@@ -285,9 +304,11 @@ class MainActivity : AppCompatActivity() {
             if (isGranted) {
                 statusText.text = TranslationsManager.getStatusReady(currentLanguage)
                 Toast.makeText(this, "Permiso otorgado", Toast.LENGTH_SHORT).show()
+                Log.i(TAG, "✅ Permiso de cámara concedido")
             } else {
                 statusText.text = TranslationsManager.getCameraPermissionRequired(currentLanguage)
                 Toast.makeText(this, TranslationsManager.getCameraPermissionRequired(currentLanguage), Toast.LENGTH_LONG).show()
+                Log.w(TAG, "⚠️ Permiso de cámara denegado")
             }
         }
 
@@ -301,51 +322,81 @@ class MainActivity : AppCompatActivity() {
         Log.i(TAG, "▶️ Iniciando detección")
         
         try {
-            // Limpiar overlay antes de iniciar
+            // Limpiar completamente antes de iniciar
             overlayView.clearDetections()
+            previewView.removeAllViews()
             
-            cameraManager.initializeCamera()
+            // Actualizar UI inmediatamente
             detecting = true
             statusText.text = TranslationsManager.getStatusDetecting(currentLanguage)
             startButton.text = TranslationsManager.getStopDetection(currentLanguage)
             totalDetections = 0
             counterText.text = "0"
             
+            // Iniciar cámara
+            cameraManager.initializeCamera()
+            
+            // ⚠️ IMPORTANTE: Ocultar anuncios durante detección
+            adManager.onDetectionStarted()
+            
             Toast.makeText(this, TranslationsManager.getDetectionStarted(currentLanguage), Toast.LENGTH_SHORT).show()
+            Log.i(TAG, "✅ Detección iniciada - Anuncios OCULTOS")
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error: ${e.message}", e)
+            Log.e(TAG, "❌ Error iniciando detección: ${e.message}", e)
+            detecting = false
+            updateUILanguage()
             Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 
     private fun stopDetection() {
-        Log.i(TAG, "⏹️ Deteniendo")
+        Log.i(TAG, "⏹️ Deteniendo detección")
         
         try {
-            // Detener cámara primero
+            // Actualizar UI primero
+            detecting = false
+            statusText.text = TranslationsManager.getStatusReady(currentLanguage)
+            startButton.text = TranslationsManager.getStartDetection(currentLanguage)
+            
+            // Detener cámara
             cameraManager.stopCamera()
             
-            // Dar tiempo para que se detenga completamente
+            // ⚠️ IMPORTANTE: Mostrar anuncios al terminar detección
+            adManager.onDetectionStopped()
+            
+            // Limpiar UI con delay para asegurar que todo se detenga
             lifecycleScope.launch {
-                delay(200)
+                delay(300)
                 
-                // Limpiar completamente la UI
                 runOnUiThread {
-                    detecting = false
-                    statusText.text = TranslationsManager.getStatusReady(currentLanguage)
-                    startButton.text = TranslationsManager.getStartDetection(currentLanguage)
+                    // Limpiar overlay
                     overlayView.clearDetections()
+                    
+                    // Resetear contador
                     totalDetections = 0
                     counterText.text = "0"
                     
-                    // Forzar redibujo del preview para limpiar imagen residual
+                    // Forzar redibujo limpio del preview
+                    previewView.removeAllViews()
                     previewView.invalidate()
+                    
+                    Log.i(TAG, "✅ Detección detenida y UI limpia")
                 }
                 
-                Toast.makeText(this@MainActivity, TranslationsManager.getDetectionStopped(currentLanguage), Toast.LENGTH_SHORT).show()
+                // Mostrar anuncio intersticial al finalizar detección (después de 500ms)
+                delay(500)
+                adManager.showDetectionEndAd(this@MainActivity)
+                
+                Toast.makeText(
+                    this@MainActivity, 
+                    TranslationsManager.getDetectionStopped(currentLanguage), 
+                    Toast.LENGTH_SHORT
+                ).show()
+                
+                Log.i(TAG, "✅ Detección finalizada - Anuncios VISIBLES")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error: ${e.message}", e)
+            Log.e(TAG, "❌ Error deteniendo detección: ${e.message}", e)
         }
     }
 
@@ -354,7 +405,7 @@ class MainActivity : AppCompatActivity() {
             totalDetections += detections.size
             counterText.text = totalDetections.toString()
             
-            Log.i(TAG, "📊 Total: $totalDetections")
+            Log.i(TAG, "📊 Total detecciones: $totalDetections")
             
             if (soundEnabled) {
                 playAlert()
@@ -364,7 +415,7 @@ class MainActivity : AppCompatActivity() {
                 val vibrator = getSystemService(VIBRATOR_SERVICE) as? android.os.Vibrator
                 vibrator?.vibrate(200)
             } catch (e: Exception) {
-                Log.w(TAG, "No se pudo vibrar: ${e.message}")
+                Log.w(TAG, "⚠️ No se pudo vibrar: ${e.message}")
             }
         }
     }
@@ -381,7 +432,7 @@ class MainActivity : AppCompatActivity() {
         try {
             if (soundPool != null && alertSoundId > 0) {
                 soundPool?.play(alertSoundId, 1.0f, 1.0f, 1, 0, 1.0f)
-                Log.d(TAG, "🔊 Alerta reproducida")
+                Log.d(TAG, "🔊 Alerta sonora reproducida")
             } else {
                 val toneGen = android.media.ToneGenerator(
                     android.media.AudioManager.STREAM_ALARM,
@@ -389,7 +440,7 @@ class MainActivity : AppCompatActivity() {
                 )
                 toneGen.startTone(android.media.ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 200)
                 toneGen.release()
-                Log.d(TAG, "🔊 Tono reproducido")
+                Log.d(TAG, "🔊 Tono de alerta reproducido")
             }
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error reproduciendo alerta: ${e.message}")
@@ -399,29 +450,47 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         
+        Log.i(TAG, "🔴 Destruyendo MainActivity")
+        
         // Quitar flag de pantalla encendida
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         
         try {
             soundPool?.release()
             soundPool = null
+            
             detectionManager.release()
+            
             if (detecting) {
                 cameraManager.stopCamera()
             }
+            
+            // Destruir anuncios
+            adManager.destroy()
+            
+            Log.i(TAG, "✅ Recursos liberados correctamente")
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error en onDestroy: ${e.message}")
+            Log.e(TAG, "❌ Error en onDestroy: ${e.message}", e)
         }
     }
 
     override fun onPause() {
         super.onPause()
-        // No detener cámara en onPause para mantener detección activa
-        Log.d(TAG, "⏸️ Activity pausada")
+        
+        // Pausar anuncios
+        adManager.pause()
+        
+        Log.d(TAG, "⏸️ Activity pausada - Anuncios pausados")
     }
 
     override fun onResume() {
         super.onResume()
+        
+        // Mantener pantalla encendida al resumir
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        
+        // Resumir anuncios
+        adManager.resume()
         
         lifecycleScope.launch {
             val settings = settingsManager.settingsFlow.first()
@@ -430,6 +499,6 @@ class MainActivity : AppCompatActivity() {
             updateUILanguage()
         }
         
-        Log.d(TAG, "▶️ Activity resumida")
+        Log.d(TAG, "▶️ Activity resumida - Anuncios resumidos")
     }
 }

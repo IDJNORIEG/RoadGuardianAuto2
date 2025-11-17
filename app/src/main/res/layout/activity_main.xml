@@ -75,7 +75,8 @@
         android:id="@+id/cameraContainer"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_below="@id/topBar">
+        android:layout_below="@id/topBar"
+        android:layout_above="@id/adContainer">
 
         <!-- Vista previa de cámara -->
         <androidx.camera.view.PreviewView
@@ -88,6 +89,24 @@
             android:id="@+id/detectionOverlay"
             android:layout_width="match_parent"
             android:layout_height="match_parent"/>
+    </FrameLayout>
+
+    </FrameLayout>
+
+    <!-- Contenedor del Banner AdMob (barra inferior) -->
+    <FrameLayout
+        android:id="@+id/adContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:background="@color/background_dark">
+
+        <com.google.android.gms.ads.AdView
+            android:id="@+id/adView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:visibility="gone"/>
     </FrameLayout>
 
 </RelativeLayout>
