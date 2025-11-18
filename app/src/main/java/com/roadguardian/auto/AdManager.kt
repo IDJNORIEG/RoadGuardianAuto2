@@ -23,8 +23,8 @@ class AdManager(private val context: Context) {
         private const val TAG = "AdManager"
         
         // ⚠️ IDs de prueba - REEMPLAZA CON TUS IDs REALES DE ADMOB
-        //private const val BANNER_AD_UNIT_ID = "ca-app-pub-3940256099942544/6300978111" // Test ID
-        //private const val INTERSTITIAL_AD_UNIT_ID = "ca-app-pub-3940256099942544/1033173712" // Test ID
+        // private const val BANNER_AD_UNIT_ID = "ca-app-pub-3940256099942544/6300978111" // Test ID
+        // private const val INTERSTITIAL_AD_UNIT_ID = "ca-app-pub-3940256099942544/1033173712" // Test ID
         
         // ⚠️ Para producción, reemplaza con tus IDs reales:
         private const val BANNER_AD_UNIT_ID = "ca-app-pub-8690577445002348/8703720200"
@@ -61,25 +61,41 @@ class AdManager(private val context: Context) {
         try {
             bannerAd = adView
             
+            // Asegurarse de que el AdView esté visible inicialmente
+            adView.visibility = View.VISIBLE
+            
             val adRequest = AdRequest.Builder().build()
             adView.loadAd(adRequest)
             
             adView.adListener = object : AdListener() {
                 override fun onAdLoaded() {
-                    Log.d(TAG, "📢 Banner cargado")
+                    Log.d(TAG, "📢 Banner cargado exitosamente")
                     // Solo mostrar si NO está detectando
                     if (!isDetecting) {
                         adView.visibility = View.VISIBLE
+                        Log.d(TAG, "👁️ Banner visible")
+                    } else {
+                        adView.visibility = View.GONE
+                        Log.d(TAG, "👻 Banner oculto (detectando)")
                     }
                 }
 
                 override fun onAdFailedToLoad(adError: LoadAdError) {
-                    Log.w(TAG, "⚠️ Banner falló: ${adError.message}")
+                    Log.e(TAG, "❌ Banner falló: Code=${adError.code}, Message=${adError.message}")
+                    Log.e(TAG, "   Domain: ${adError.domain}, Cause: ${adError.cause}")
                     adView.visibility = View.GONE
                 }
 
                 override fun onAdClicked() {
                     Log.d(TAG, "👆 Banner clickeado")
+                }
+
+                override fun onAdOpened() {
+                    Log.d(TAG, "📖 Banner abierto")
+                }
+
+                override fun onAdClosed() {
+                    Log.d(TAG, "📕 Banner cerrado")
                 }
             }
             

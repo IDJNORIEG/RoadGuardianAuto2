@@ -98,14 +98,14 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
-        android:background="@color/background_dark">
+        android:background="#1E1E1E"
+        android:padding="4dp">
 
         <com.google.android.gms.ads.AdView
             android:id="@+id/adView"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:visibility="gone"
             ads:adSize="BANNER"
             ads:adUnitId="ca-app-pub-8690577445002348/8703720200"/>
     </FrameLayout>

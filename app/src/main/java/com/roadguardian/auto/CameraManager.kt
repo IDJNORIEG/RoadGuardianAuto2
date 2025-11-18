@@ -49,7 +49,15 @@ class CameraManager(
         Log.d(TAG, "📷 INICIALIZANDO CÁMARA")
         Log.d(TAG, SEPARATOR)
         
-        // Limpiar estado previo completamente
+        // CRÍTICO: Detener cualquier cámara activa primero
+        //if (isCameraActive) {
+        //    Log.w(TAG, "⚠️ Cámara ya activa, deteniendo primero...")
+        //    stopCamera()
+        //    // Dar tiempo para que se liberen los recursos
+        //    Thread.sleep(500)
+        //}
+        
+        // Limpiar completamente recursos previos
         cleanupCamera()
         
         // Crear nuevo executor

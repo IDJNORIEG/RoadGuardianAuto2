@@ -1,7 +1,6 @@
 package com.roadguardian.auto
 
-import android.Manifest 
-import android.content.Context
+import android.Manifest
 import android.content.pm.PackageManager
 import android.media.AudioAttributes
 import android.media.SoundPool
@@ -89,9 +88,10 @@ class MainActivity : AppCompatActivity() {
             setupLanguageSpinner()
             checkCameraPermission()
             
-            // Mostrar anuncio de bienvenida después de 2 segundos
+            // Mostrar anuncio de bienvenida después de 3 segundos
             lifecycleScope.launch {
-                delay(2000)
+                delay(3000)
+                Log.d(TAG, "🎬 Mostrando anuncio de bienvenida...")
                 adManager.showWelcomeAd(this@MainActivity)
             }
             
@@ -136,12 +136,23 @@ class MainActivity : AppCompatActivity() {
             // Obtener AdView (ya configurado en XML con adSize y adUnitId)
             adView = findViewById(R.id.adView)
             
+            // Verificar que el AdView existe
+            if (adView == null) {
+                Log.e(TAG, "❌ AdView es NULL - verificar activity_main.xml")
+                return
+            }
+            
+            Log.d(TAG, "✅ AdView encontrado")
+            Log.d(TAG, "   AdSize: ${adView.adSize}")
+            Log.d(TAG, "   AdUnitId: ${adView.adUnitId}")
+            
             // Cargar banner
             adManager.loadBanner(adView)
             
             Log.d(TAG, "✅ Sistema de anuncios inicializado correctamente")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error inicializando ads: ${e.message}", e)
+            e.printStackTrace()
             // La app continúa funcionando sin anuncios
         }
     }
@@ -411,8 +422,22 @@ class MainActivity : AppCompatActivity() {
             }
             
             try {
-                val vibrator = getSystemService(VIBRATOR_SERVICE) as? android.os.Vibrator
-                vibrator?.vibrate(200)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    // Android 12+ (API 31+)
+                    val vibratorManager = getSystemService(VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                    val vibrator = vibratorManager?.defaultVibrator
+                    vibrator?.vibrate(VibrationEffect.createOneShot(200, VibrationEffect.DEFAULT_AMPLITUDE))
+                } else {
+                    // Android 11 y anteriores
+                    @Suppress("DEPRECATION")
+                    val vibrator = getSystemService(VIBRATOR_SERVICE) as? Vibrator
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        vibrator?.vibrate(VibrationEffect.createOneShot(200, VibrationEffect.DEFAULT_AMPLITUDE))
+                    } else {
+                        @Suppress("DEPRECATION")
+                        vibrator?.vibrate(200)
+                    }
+                }
             } catch (e: Exception) {
                 Log.w(TAG, "⚠️ No se pudo vibrar: ${e.message}")
             }
