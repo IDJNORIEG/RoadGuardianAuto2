@@ -33,6 +33,7 @@ class CameraManager(
     private var cameraProvider: ProcessCameraProvider? = null
     private var cameraExecutor: ExecutorService? = null
     private var imageAnalyzer: ImageAnalysis? = null
+    private var camera: Camera? = null
     private var isCameraActive = false
     private var frameCount = 0
     private var processingFrame = false
@@ -48,11 +49,17 @@ class CameraManager(
         Log.d(TAG, "📷 INICIALIZANDO CÁMARA")
         Log.d(TAG, SEPARATOR)
         
-        // Crear nuevo executor si no existe o fue cerrado
-        if (cameraExecutor == null || cameraExecutor?.isShutdown == true) {
-            cameraExecutor = Executors.newSingleThreadExecutor()
-            Log.d(TAG, "✅ Nuevo executor creado")
-        }
+        // Limpiar estado previo completamente
+        cleanupCamera()
+        
+        // Crear nuevo executor
+        cameraExecutor = Executors.newSingleThreadExecutor()
+        Log.d(TAG, "✅ Nuevo executor creado")
+        
+        // Resetear variables de control
+        frameCount = 0
+        processingFrame = false
+        isCameraActive = false
         
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
 
@@ -104,7 +111,8 @@ class CameraManager(
                 .requireLensFacing(CameraSelector.LENS_FACING_BACK)
                 .build()
 
-            cameraProvider.bindToLifecycle(
+            // Guardar referencia a la cámara
+            camera = cameraProvider.bindToLifecycle(
                 lifecycleOwner,
                 cameraSelector,
                 preview,
@@ -112,8 +120,6 @@ class CameraManager(
             )
 
             isCameraActive = true
-            frameCount = 0
-            processingFrame = false
             
             Log.i(TAG, SEPARATOR)
             Log.i(TAG, "✅ CÁMARA INICIADA CORRECTAMENTE")
@@ -265,17 +271,43 @@ class CameraManager(
         }
     }
 
-    fun stopCamera() {
+    private fun cleanupCamera() {
         try {
-            Log.i(TAG, "🛑 Deteniendo cámara...")
+            Log.d(TAG, "🧹 Limpiando recursos previos...")
             
+            // Detener procesamiento
             isCameraActive = false
+            processingFrame = false
             
             // Desconectar casos de uso
             cameraProvider?.unbindAll()
             
-            // Limpiar overlay
+            // Liberar executor
+            cameraExecutor?.shutdown()
+            cameraExecutor = null
+            
+            // Limpiar referencias
+            camera = null
+            imageAnalyzer = null
+            
+            Log.d(TAG, "✅ Recursos limpiados")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error limpiando: ${e.message}", e)
+        }
+    }
+
+    fun stopCamera() {
+        try {
+            Log.i(TAG, "🛑 Deteniendo cámara...")
+            
+            // Marcar como inactiva primero
+            isCameraActive = false
+            
+            // Limpiar overlay inmediatamente
             overlayView.clearDetections()
+            
+            // Desconectar casos de uso
+            cameraProvider?.unbindAll()
             
             // Cerrar executor
             cameraExecutor?.shutdown()
@@ -284,6 +316,8 @@ class CameraManager(
             // Resetear variables
             frameCount = 0
             processingFrame = false
+            camera = null
+            imageAnalyzer = null
             
             Log.i(TAG, "✅ Cámara detenida completamente")
         } catch (e: Exception) {

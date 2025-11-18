@@ -1,10 +1,15 @@
 package com.roadguardian.auto
 
-import android.Manifest
+import android.Manifest 
+import android.content.Context
 import android.content.pm.PackageManager
 import android.media.AudioAttributes
 import android.media.SoundPool
+import android.os.Build
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.util.Log
 import android.view.View
 import android.view.WindowManager
@@ -128,14 +133,8 @@ class MainActivity : AppCompatActivity() {
             adManager = AdManager(this)
             adManager.initialize()
             
-            // Obtener y configurar AdView
+            // Obtener AdView (ya configurado en XML con adSize y adUnitId)
             adView = findViewById(R.id.adView)
-            adView.apply {
-                setAdSize(com.google.android.gms.ads.AdSize.BANNER)
-                // ⚠️ ID de prueba - Reemplaza con tu ID real de producción
-                adUnitId = "ca-app-pub-8690577445002348/8703720200"
-                // Para producción: adUnitId = "TU_BANNER_ID_REAL"
-            }
             
             // Cargar banner
             adManager.loadBanner(adView)

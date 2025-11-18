@@ -61,8 +61,8 @@ class DetectionOverlayView @JvmOverloads constructor(
 
     fun scaleDetections(
         detections: List<Detection>,
-        viewWidth: Int,
-        viewHeight: Int
+        @Suppress("UNUSED_PARAMETER") viewWidth: Int,
+        @Suppress("UNUSED_PARAMETER") viewHeight: Int
     ): List<Detection> = detections
 
     override fun onDraw(canvas: Canvas) {
