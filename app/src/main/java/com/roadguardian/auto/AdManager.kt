@@ -10,7 +10,7 @@ import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 
 /**
  * Gestor centralizado de anuncios AdMob
- * Garantiza que NO se muestren anuncios durante la detección activa
+ * ✅ CORREGIDO: Banner visible por defecto, oculto solo durante detección
  */
 class AdManager(private val context: Context) {
 
@@ -22,11 +22,7 @@ class AdManager(private val context: Context) {
     companion object {
         private const val TAG = "AdManager"
         
-        // ⚠️ IDs de prueba - REEMPLAZA CON TUS IDs REALES DE ADMOB
-        // private const val BANNER_AD_UNIT_ID = "ca-app-pub-3940256099942544/6300978111" // Test ID
-        // private const val INTERSTITIAL_AD_UNIT_ID = "ca-app-pub-3940256099942544/1033173712" // Test ID
-        
-        // ⚠️ Para producción, reemplaza con tus IDs reales:
+        // IDs REALES de producción
         private const val BANNER_AD_UNIT_ID = "ca-app-pub-8690577445002348/8703720200"
         private const val INTERSTITIAL_AD_UNIT_ID = "ca-app-pub-8690577445002348/4251956414"
         
@@ -54,14 +50,13 @@ class AdManager(private val context: Context) {
     }
 
     /**
-     * Carga el banner en un AdView
-     * SOLO se muestra cuando NO está detectando
+     * ✅ CORREGIDO: Carga el banner y lo hace VISIBLE inmediatamente
      */
     fun loadBanner(adView: AdView) {
         try {
             bannerAd = adView
             
-            // Asegurarse de que el AdView esté visible inicialmente
+            // ✅ Banner VISIBLE por defecto
             adView.visibility = View.VISIBLE
             
             val adRequest = AdRequest.Builder().build()
@@ -70,36 +65,28 @@ class AdManager(private val context: Context) {
             adView.adListener = object : AdListener() {
                 override fun onAdLoaded() {
                     Log.d(TAG, "📢 Banner cargado exitosamente")
-                    // Solo mostrar si NO está detectando
-                    if (!isDetecting) {
-                        adView.visibility = View.VISIBLE
-                        Log.d(TAG, "👁️ Banner visible")
-                    } else {
-                        adView.visibility = View.GONE
-                        Log.d(TAG, "👻 Banner oculto (detectando)")
-                    }
+                    // ✅ Mantener visible solo si NO está detectando
+                    adView.visibility = if (isDetecting) View.GONE else View.VISIBLE
+                    Log.d(TAG, if (isDetecting) "👻 Banner oculto (detectando)" else "👁️ Banner visible")
                 }
 
                 override fun onAdFailedToLoad(adError: LoadAdError) {
                     Log.e(TAG, "❌ Banner falló: Code=${adError.code}, Message=${adError.message}")
-                    Log.e(TAG, "   Domain: ${adError.domain}, Cause: ${adError.cause}")
-                    adView.visibility = View.GONE
+                    Log.e(TAG, "   Domain: ${adError.domain}, ResponseInfo: ${adError.responseInfo}")
+                    // ✅ Mantener visible aunque falle la carga
+                    adView.visibility = View.VISIBLE
                 }
 
                 override fun onAdClicked() {
                     Log.d(TAG, "👆 Banner clickeado")
                 }
 
-                override fun onAdOpened() {
-                    Log.d(TAG, "📖 Banner abierto")
-                }
-
-                override fun onAdClosed() {
-                    Log.d(TAG, "📕 Banner cerrado")
+                override fun onAdImpression() {
+                    Log.d(TAG, "👀 Banner impresión registrada")
                 }
             }
             
-            Log.d(TAG, "🎯 Banner cargando...")
+            Log.d(TAG, "🎯 Banner cargando con ID: $BANNER_AD_UNIT_ID")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error cargando banner: ${e.message}", e)
         }
@@ -141,7 +128,7 @@ class AdManager(private val context: Context) {
                     }
 
                     override fun onAdFailedToLoad(adError: LoadAdError) {
-                        Log.w(TAG, "⚠️ Intersticial falló al cargar: ${adError.message}")
+                        Log.w(TAG, "⚠️ Intersticial falló al cargar: Code=${adError.code}, Message=${adError.message}")
                         interstitialAd = null
                         
                         // Reintentar después de 30 segundos
@@ -158,11 +145,10 @@ class AdManager(private val context: Context) {
 
     /**
      * Muestra anuncio intersticial de bienvenida
-     * Solo se muestra UNA VEZ por sesión al iniciar la app
      */
     fun showWelcomeAd(activity: Activity) {
         if (hasShownWelcomeAd) {
-            Log.d(TAG, "ℹ️ Ya se mostró el anuncio de bienvenida en esta sesión")
+            Log.d(TAG, "ℹ️ Ya se mostró el anuncio de bienvenida")
             return
         }
         
@@ -177,7 +163,6 @@ class AdManager(private val context: Context) {
 
     /**
      * Muestra anuncio intersticial al finalizar detección
-     * Solo si ha pasado suficiente tiempo desde el último
      */
     fun showDetectionEndAd(activity: Activity) {
         val currentTime = System.currentTimeMillis()
@@ -215,53 +200,25 @@ class AdManager(private val context: Context) {
     }
 
     /**
-     * Notifica que la detección ha iniciado
-     * OCULTA todos los anuncios automáticamente
+     * ✅ CORREGIDO: Oculta banner durante detección
      */
     fun onDetectionStarted() {
         isDetecting = true
-        hideBanner()
-        Log.i(TAG, "🚗 Detección iniciada - Anuncios OCULTOS")
+        bannerAd?.visibility = View.GONE
+        Log.i(TAG, "🚗 Detección iniciada - Banner OCULTO")
     }
 
     /**
-     * Notifica que la detección ha terminado
-     * MUESTRA el banner nuevamente
+     * ✅ CORREGIDO: Muestra banner al terminar detección
      */
     fun onDetectionStopped() {
         isDetecting = false
-        showBanner()
+        bannerAd?.visibility = View.VISIBLE
         Log.i(TAG, "🛑 Detección detenida - Banner VISIBLE")
     }
 
     /**
-     * Oculta el banner
-     */
-    private fun hideBanner() {
-        try {
-            bannerAd?.visibility = View.GONE
-            Log.d(TAG, "👻 Banner ocultado")
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Error ocultando banner: ${e.message}")
-        }
-    }
-
-    /**
-     * Muestra el banner (solo si NO está detectando)
-     */
-    private fun showBanner() {
-        try {
-            if (!isDetecting) {
-                bannerAd?.visibility = View.VISIBLE
-                Log.d(TAG, "👁️ Banner visible")
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Error mostrando banner: ${e.message}")
-        }
-    }
-
-    /**
-     * Pausa los anuncios (llamar en onPause)
+     * Pausa los anuncios
      */
     fun pause() {
         try {
@@ -273,7 +230,7 @@ class AdManager(private val context: Context) {
     }
 
     /**
-     * Resume los anuncios (llamar en onResume)
+     * Resume los anuncios
      */
     fun resume() {
         try {
@@ -285,7 +242,7 @@ class AdManager(private val context: Context) {
     }
 
     /**
-     * Destruye los anuncios (llamar en onDestroy)
+     * Destruye los anuncios
      */
     fun destroy() {
         try {
