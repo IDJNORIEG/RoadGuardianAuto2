@@ -24,6 +24,8 @@ import com.roadguardian.auto.ui.DetectionOverlayView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity() {
 
@@ -125,20 +127,19 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // ============================================================================
+    // ✅ CAMBIO 1: initializeAds() - Fix warning de null check
+    // ============================================================================
     private fun initializeAds() {
         try {
             Log.d(TAG, "📢 Inicializando sistema de anuncios...")
             
-            // Crear AdManager
             adManager = AdManager(this)
             adManager.initialize()
             
-            // Obtener AdView (ya configurado en XML con adSize y adUnitId)
-            adView = findViewById(R.id.adView)
-            
-            // Verificar que el AdView existe
-            if (adView == null) {
-                Log.e(TAG, "❌ AdView es NULL - verificar activity_main.xml")
+            // ✅ FIX: Verificación segura con ?: en lugar de ==
+            adView = findViewById(R.id.adView) ?: run {
+                Log.e(TAG, "❌ AdView no encontrado en layout")
                 return
             }
             
@@ -146,14 +147,12 @@ class MainActivity : AppCompatActivity() {
             Log.d(TAG, "   AdSize: ${adView.adSize}")
             Log.d(TAG, "   AdUnitId: ${adView.adUnitId}")
             
-            // Cargar banner
             adManager.loadBanner(adView)
             
             Log.d(TAG, "✅ Sistema de anuncios inicializado correctamente")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error inicializando ads: ${e.message}", e)
             e.printStackTrace()
-            // La app continúa funcionando sin anuncios
         }
     }
 
@@ -322,6 +321,9 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+    // ============================================================================
+    // ✅ CAMBIO 2: startDetection() - Versión final con delays optimizados
+    // ============================================================================
     private fun startDetection() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
             != PackageManager.PERMISSION_GRANTED) {
@@ -331,82 +333,115 @@ class MainActivity : AppCompatActivity() {
         
         Log.i(TAG, "▶️ Iniciando detección")
         
-        try {
-            // Limpiar completamente antes de iniciar
-            overlayView.clearDetections()
-            previewView.removeAllViews()
-            
-            // Actualizar UI inmediatamente
-            detecting = true
-            statusText.text = TranslationsManager.getStatusDetecting(currentLanguage)
-            startButton.text = TranslationsManager.getStopDetection(currentLanguage)
-            totalDetections = 0
-            counterText.text = "0"
-            
-            // Iniciar cámara
-            cameraManager.initializeCamera()
-            
-            // ⚠️ IMPORTANTE: Ocultar anuncios durante detección
-            adManager.onDetectionStarted()
-            
-            Toast.makeText(this, TranslationsManager.getDetectionStarted(currentLanguage), Toast.LENGTH_SHORT).show()
-            Log.i(TAG, "✅ Detección iniciada - Anuncios OCULTOS")
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Error iniciando detección: ${e.message}", e)
-            detecting = false
-            updateUILanguage()
-            Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+        // ✅ Actualizar UI primero
+        detecting = true
+        statusText.text = TranslationsManager.getStatusDetecting(currentLanguage)
+        startButton.text = TranslationsManager.getStopDetection(currentLanguage)
+        totalDetections = 0
+        counterText.text = "0"
+        
+        // ✅ Limpiar UI
+        overlayView.clearDetections()
+        previewView.removeAllViews()
+        
+        // ✅ CRÍTICO: Iniciar cámara de forma suspendible
+        lifecycleScope.launch {
+            try {
+                Log.d(TAG, "🎬 Llamando a initializeCamera()...")
+                cameraManager.initializeCamera()
+                
+                // Pequeña espera para asegurar que la cámara inició
+                delay(300)
+                
+                withContext(Dispatchers.Main) {
+                    adManager.onDetectionStarted()
+                    
+                    Toast.makeText(
+                        this@MainActivity, 
+                        TranslationsManager.getDetectionStarted(currentLanguage), 
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+                
+                Log.i(TAG, "✅ Detección iniciada correctamente")
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error iniciando detección: ${e.message}", e)
+                withContext(Dispatchers.Main) {
+                    detecting = false
+                    updateUILanguage()
+                    Toast.makeText(
+                        this@MainActivity, 
+                        "Error: ${e.message}", 
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
         }
     }
 
+    // ============================================================================
+    // ✅ CAMBIO 3: stopDetection() - Versión final con sincronización correcta
+    // ============================================================================
     private fun stopDetection() {
         Log.i(TAG, "⏹️ Deteniendo detección")
         
-        try {
-            // Actualizar UI primero
-            detecting = false
-            statusText.text = TranslationsManager.getStatusReady(currentLanguage)
-            startButton.text = TranslationsManager.getStartDetection(currentLanguage)
-            
-            // Detener cámara
-            cameraManager.stopCamera()
-            
-            // ⚠️ IMPORTANTE: Mostrar anuncios al terminar detección
-            adManager.onDetectionStopped()
-            
-            // Limpiar UI con delay para asegurar que todo se detenga
-            lifecycleScope.launch {
-                delay(300)
+        // ✅ Actualizar UI inmediatamente
+        detecting = false
+        statusText.text = TranslationsManager.getStatusReady(currentLanguage)
+        startButton.text = TranslationsManager.getStartDetection(currentLanguage)
+        
+        // ✅ CRÍTICO: Detener cámara de forma suspendible
+        lifecycleScope.launch {
+            try {
+                Log.d(TAG, "🛑 Llamando a stopCameraSuspend()...")
                 
-                runOnUiThread {
-                    // Limpiar overlay
-                    overlayView.clearDetections()
+                // Detener cámara y ESPERAR
+                cameraManager.stopCameraSuspend()
+                
+                Log.i(TAG, "✅ Cámara detenida correctamente")
+                
+                // Espera adicional para asegurar liberación
+                delay(200)
+                
+                withContext(Dispatchers.Main) {
+                    // Mostrar anuncios
+                    adManager.onDetectionStopped()
                     
-                    // Resetear contador
+                    // Limpiar UI
+                    overlayView.clearDetections()
                     totalDetections = 0
                     counterText.text = "0"
-                    
-                    // Forzar redibujo limpio del preview
                     previewView.removeAllViews()
                     previewView.invalidate()
                     
-                    Log.i(TAG, "✅ Detección detenida y UI limpia")
+                    Log.i(TAG, "✅ UI limpia")
                 }
                 
-                // Mostrar anuncio intersticial al finalizar detección (después de 500ms)
+                // Esperar antes de intersticial
                 delay(500)
-                adManager.showDetectionEndAd(this@MainActivity)
                 
-                Toast.makeText(
-                    this@MainActivity, 
-                    TranslationsManager.getDetectionStopped(currentLanguage), 
-                    Toast.LENGTH_SHORT
-                ).show()
+                withContext(Dispatchers.Main) {
+                    adManager.showDetectionEndAd(this@MainActivity)
+                    Toast.makeText(
+                        this@MainActivity,
+                        TranslationsManager.getDetectionStopped(currentLanguage),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
                 
-                Log.i(TAG, "✅ Detección finalizada - Anuncios VISIBLES")
+                Log.i(TAG, "✅ Detección finalizada completamente")
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error deteniendo detección: ${e.message}", e)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Error: ${e.message}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Error deteniendo detección: ${e.message}", e)
         }
     }
 
@@ -471,12 +506,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // ============================================================================
+    // ✅ CAMBIO 4: onDestroy() - Fix warning de deprecación
+    // ============================================================================
     override fun onDestroy() {
         super.onDestroy()
         
         Log.i(TAG, "🔴 Destruyendo MainActivity")
         
-        // Quitar flag de pantalla encendida
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         
         try {
@@ -485,11 +522,9 @@ class MainActivity : AppCompatActivity() {
             
             detectionManager.release()
             
-            if (detecting) {
-                cameraManager.stopCamera()
-            }
+            // ✅ FIX: No llamar a stopCamera() deprecated en onDestroy
+            // La app se está cerrando de todas formas
             
-            // Destruir anuncios
             adManager.destroy()
             
             Log.i(TAG, "✅ Recursos liberados correctamente")
