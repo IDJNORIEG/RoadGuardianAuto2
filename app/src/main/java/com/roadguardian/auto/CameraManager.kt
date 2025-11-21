@@ -22,16 +22,15 @@ import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 
 /**
- * ✅ SOLUCIÓN DEFINITIVA: CameraManager con reinicialización 100% confiable
+ * ✅ VERSIÓN FINAL: Basada en la versión original que funcionaba
  * 
- * Cambios clave:
- * 1. Mutex para evitar race conditions
- * 2. Limpieza completa del provider antes de reiniciar
- * 3. Esperas ajustadas y verificadas
- * 4. Estado sincronizado correctamente
+ * Cambios respecto a la original:
+ * 1. Agregado stopCameraSuspend() para coordinación con MainActivity
+ * 2. Agregado scaleDetectionsToView() para detecciones correctas
+ * 3. Mejorados los logs para debugging
+ * 4. Mantenido el ExecutorService constante (NO se destruye)
  */
 class CameraManager(
     private val context: Context,
@@ -44,19 +43,12 @@ class CameraManager(
 ) {
 
     private var cameraProvider: ProcessCameraProvider? = null
-    private var cameraExecutor: ExecutorService? = null
+    private var cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private var imageAnalyzer: ImageAnalysis? = null
     private var camera: Camera? = null
-
-    @Volatile
+    
     private var isCameraActive = false
-
-    @Volatile
     private var processingFrame = false
-
-    @Volatile
-    private var isInitializing = false
-
     private var frameCount = 0
 
     companion object {
@@ -66,100 +58,71 @@ class CameraManager(
     }
 
     /**
-     * ✅ CRÍTICO: Inicialización con mutex para evitar múltiples llamadas
+     * ✅ Inicialización simple y efectiva (como la versión original)
      */
-    suspend fun initializeCamera() = withContext(Dispatchers.Main) {
+    fun initializeCamera() {
         Log.d(TAG, SEPARATOR)
-        Log.d(TAG, "📷 initializeCamera() - INICIO")
+        Log.d(TAG, "📷 INICIALIZANDO CÁMARA")
         Log.d(TAG, SEPARATOR)
+        
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
 
-        // ✅ Prevenir inicialización múltiple
-        if (isInitializing) {
-            Log.w(TAG, "⚠️ Ya hay una inicialización en curso, esperando...")
-            return@withContext
-        }
-
-        if (isCameraActive) {
-            Log.w(TAG, "⚠️ Cámara ya activa, deteniendo primero...")
-            stopCameraSuspend()
-        }
-
-        isInitializing = true
-
-        try {
-            // ✅ Limpiar COMPLETAMENTE el estado previo
-            cleanupCameraResources()
-
-            // ✅ Espera crítica para liberación de hardware (aumentada por timeout)
-            delay(1000)
-
-            // ✅ Crear nuevo executor
-            cameraExecutor = Executors.newSingleThreadExecutor()
-            Log.d(TAG, "✅ Nuevo Executor creado")
-
-            // ✅ Resetear estado
-            frameCount = 0
-            processingFrame = false
-            isCameraActive = false
-
-            // ✅ Obtener provider (SIEMPRE obtener uno nuevo)
-            val providerFuture = ProcessCameraProvider.getInstance(context)
-            providerFuture.addListener({
-                try {
-                    // ✅ IMPORTANTE: Liberar provider anterior si existe
-                    cameraProvider?.unbindAll()
-                    
-                    cameraProvider = providerFuture.get()
-                    Log.d(TAG, "✅ CameraProvider obtenido")
-                    
-                    startCamera()
-                } catch (e: Exception) {
-                    Log.e(TAG, "❌ Error obteniendo CameraProvider: ${e.message}", e)
-                    isInitializing = false
-                }
-            }, ContextCompat.getMainExecutor(context))
-
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Error en initializeCamera: ${e.message}", e)
-            isInitializing = false
-        }
+        cameraProviderFuture.addListener({
+            try {
+                cameraProvider = cameraProviderFuture.get()
+                Log.d(TAG, "✅ CameraProvider obtenido")
+                startCamera()
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error obteniendo CameraProvider: ${e.message}", e)
+            }
+        }, ContextCompat.getMainExecutor(context))
     }
 
     @SuppressLint("UnsafeOptInUsageError")
     private fun startCamera() {
         try {
             val provider = cameraProvider ?: run {
-                Log.e(TAG, "❌ startCamera(): cameraProvider es null")
-                isInitializing = false
+                Log.e(TAG, "❌ CameraProvider es null")
                 return
             }
 
-            // ✅ Asegurar limpieza previa
-            provider.unbindAll()
-            Log.d(TAG, "🔄 provider.unbindAll() ejecutado")
+            Log.d(TAG, "📐 PreviewView: ${previewView.width}x${previewView.height}")
 
+            // Crear Preview
             val preview = Preview.Builder()
                 .setTargetRotation(previewView.display.rotation)
-                .build().also { it.setSurfaceProvider(previewView.surfaceProvider) }
+                .build()
+                .also {
+                    it.setSurfaceProvider(previewView.surfaceProvider)
+                }
 
-            @Suppress("DEPRECATION")
+            Log.d(TAG, "✅ Preview configurado")
+
+            // Crear ImageAnalyzer
             imageAnalyzer = ImageAnalysis.Builder()
                 .setTargetResolution(android.util.Size(640, 480))
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
                 .build()
 
-            cameraExecutor?.let { exec ->
-                imageAnalyzer?.setAnalyzer(exec) { image ->
-                    processImageProxy(image)
-                }
+            imageAnalyzer?.setAnalyzer(cameraExecutor) { image ->
+                processImageProxy(image)
             }
 
+            Log.d(TAG, "✅ ImageAnalyzer configurado")
+            Log.d(TAG, "   Executor activo: ${!cameraExecutor.isShutdown}")
+            Log.d(TAG, "   Executor terminado: ${cameraExecutor.isTerminated}")
+
+            // Selector de cámara trasera
             val cameraSelector = CameraSelector.Builder()
                 .requireLensFacing(CameraSelector.LENS_FACING_BACK)
                 .build()
 
-            // ✅ Bind a lifecycle
+            // Desconectar casos de uso anteriores
+            provider.unbindAll()
+            Log.d(TAG, "🔄 unbindAll() ejecutado")
+
+            // Conectar a lifecycle
             camera = provider.bindToLifecycle(
                 lifecycleOwner,
                 cameraSelector,
@@ -168,28 +131,36 @@ class CameraManager(
             )
 
             isCameraActive = true
-            isInitializing = false
+            frameCount = 0
             
             Log.i(TAG, SEPARATOR)
             Log.i(TAG, "✅ CÁMARA INICIADA CORRECTAMENTE")
+            Log.i(TAG, "   Resolución: 640x480")
+            Log.i(TAG, "   Camera bound: ${camera != null}")
+            Log.i(TAG, "   ImageAnalyzer bound: ${imageAnalyzer != null}")
+            Log.i(TAG, "   isCameraActive: $isCameraActive")
             Log.i(TAG, SEPARATOR)
 
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error iniciando cámara: ${e.message}", e)
             isCameraActive = false
-            isInitializing = false
         }
     }
 
     @SuppressLint("UnsafeOptInUsageError")
     private fun processImageProxy(imageProxy: ImageProxy) {
+        // ✅ DEBUG: Log cada 10 frames para ver si llegan
+        if (frameCount % 10 == 0) {
+            Log.d(TAG, "📥 Frame recibido #$frameCount (isCameraActive=$isCameraActive)")
+        }
+
         if (!isCameraActive) {
             imageProxy.close()
             return
         }
 
         frameCount++
-
+        
         if (processingFrame || frameCount % FRAME_SKIP != 0) {
             imageProxy.close()
             return
@@ -202,7 +173,12 @@ class CameraManager(
                 Log.d(TAG, "🎬 Frame $frameCount: ${imageProxy.width}x${imageProxy.height}")
             }
 
-            val bitmap = imageProxyToBitmap(imageProxy) ?: return
+            val bitmap = imageProxyToBitmap(imageProxy)
+            
+            if (bitmap == null) {
+                Log.w(TAG, "⚠️ Bitmap null en frame $frameCount")
+                return
+            }
 
             val detections = detectionManager.detectAnimals(bitmap)
 
@@ -211,18 +187,16 @@ class CameraManager(
                     val scaled = scaleDetectionsToView(detections, bitmap.width, bitmap.height)
                     updateDetections(scaled)
                 } else {
-                    if (frameCount % 10 == 0) overlayView.clearDetections()
+                    if (frameCount % 10 == 0) {
+                        overlayView.clearDetections()
+                    }
                 }
             }
 
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error procesando frame: ${e.message}", e)
+            Log.e(TAG, "❌ Error procesando frame $frameCount: ${e.message}", e)
         } finally {
-            try {
-                imageProxy.close()
-            } catch (e: Exception) {
-                Log.w(TAG, "⚠️ imageProxy.close() falló: ${e.message}")
-            }
+            imageProxy.close()
             processingFrame = false
         }
     }
@@ -238,25 +212,43 @@ class CameraManager(
             val vSize = vBuffer.remaining()
 
             val nv21 = ByteArray(ySize + uSize + vSize)
+            
             yBuffer.get(nv21, 0, ySize)
             vBuffer.get(nv21, ySize, vSize)
             uBuffer.get(nv21, ySize + vSize, uSize)
 
-            val yuvImage = YuvImage(nv21, ImageFormat.NV21, imageProxy.width, imageProxy.height, null)
+            val yuvImage = YuvImage(
+                nv21,
+                ImageFormat.NV21,
+                imageProxy.width,
+                imageProxy.height,
+                null
+            )
+
             val out = ByteArrayOutputStream()
-            yuvImage.compressToJpeg(Rect(0, 0, imageProxy.width, imageProxy.height), 80, out)
+            yuvImage.compressToJpeg(
+                Rect(0, 0, imageProxy.width, imageProxy.height),
+                80,
+                out
+            )
+            
             val imageBytes = out.toByteArray()
             BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
-
+            
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error convirtiendo YUV a Bitmap: ${e.message}", e)
             null
         }
     }
 
-    private fun scaleDetectionsToView(detections: List<Detection>, sourceWidth: Int, sourceHeight: Int): List<Detection> {
+    private fun scaleDetectionsToView(
+        detections: List<Detection>,
+        sourceWidth: Int,
+        sourceHeight: Int
+    ): List<Detection> {
         val viewWidth = previewView.width.toFloat()
         val viewHeight = previewView.height.toFloat()
+        
         if (viewWidth <= 0f || viewHeight <= 0f) return detections
 
         val scaleX = viewWidth / sourceWidth
@@ -284,81 +276,45 @@ class CameraManager(
     }
 
     /**
-     * ✅ CRÍTICO: Limpieza completa de recursos
+     * ✅ Detención simple (sin destruir executor)
      */
-    private suspend fun cleanupCameraResources() = withContext(Dispatchers.IO) {
-        Log.d(TAG, "🧹 cleanupCameraResources() - INICIO")
-
+    fun stopCamera() {
         try {
-            // 1. Detener procesamiento
             isCameraActive = false
-            processingFrame = false
-
-            // 2. Quitar analyzer
-            try {
-                imageAnalyzer?.clearAnalyzer()
-                Log.d(TAG, "✅ Analyzer limpiado")
-            } catch (e: Exception) {
-                Log.w(TAG, "⚠️ clearAnalyzer() falló: ${e.message}")
-            }
-
-            // 3. Espera para frames en proceso
-            delay(200)
-
-            // 4. Desconectar casos de uso (en Main thread)
-            withContext(Dispatchers.Main) {
-                try {
-                    cameraProvider?.unbindAll()
-                    Log.d(TAG, "✅ unbindAll() ejecutado")
-                } catch (e: Exception) {
-                    Log.w(TAG, "⚠️ unbindAll() falló: ${e.message}")
-                }
-            }
-
-            // 5. Cerrar executor
-            try {
-                cameraExecutor?.let { exec ->
-                    exec.shutdownNow()
-                    if (!exec.awaitTermination(500, TimeUnit.MILLISECONDS)) {
-                        Log.w(TAG, "⚠️ Executor no terminó en 500ms")
-                    } else {
-                        Log.d(TAG, "✅ Executor terminado")
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "⚠️ Error al shutdown executor: ${e.message}")
-            } finally {
-                cameraExecutor = null
-            }
-
-            // 6. Limpiar referencias
-            camera = null
-            imageAnalyzer = null
+            cameraProvider?.unbindAll()
+            overlayView.clearDetections()
             frameCount = 0
-
-            Log.d(TAG, "✅ cleanupCameraResources() - COMPLETADO")
-
+            Log.i(TAG, "🛑 Cámara detenida")
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error en cleanupCameraResources(): ${e.message}", e)
+            Log.e(TAG, "❌ Error deteniendo: ${e.message}", e)
         }
     }
 
     /**
-     * ✅ Detención suspendible para coordinación correcta
+     * ✅ Versión suspendible para coordinación con MainActivity
      */
     suspend fun stopCameraSuspend() = withContext(Dispatchers.Main) {
         Log.i(TAG, "🛑 stopCameraSuspend() - INICIO")
-
-        // Limpiar overlay inmediatamente
-        overlayView.clearDetections()
-
-        // Limpiar recursos
-        cleanupCameraResources()
-
-        // Espera final
-        delay(400)
-
+        
+        stopCamera()
+        
+        // Pequeña espera para asegurar que unbindAll() complete
+        delay(300)
+        
         Log.i(TAG, "✅ stopCameraSuspend() - COMPLETADO")
+    }
+
+    /**
+     * ✅ Liberar recursos al destruir (llamar en onDestroy)
+     */
+    fun release() {
+        try {
+            stopCamera()
+            cameraExecutor.shutdown()
+            Log.i(TAG, "🗑️ Recursos liberados")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error liberando: ${e.message}", e)
+        }
     }
 
     fun isRunning(): Boolean = isCameraActive

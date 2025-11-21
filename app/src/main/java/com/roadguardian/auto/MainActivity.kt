@@ -324,6 +324,8 @@ class MainActivity : AppCompatActivity() {
     // ============================================================================
     // ✅ CAMBIO 2: startDetection() - Versión final con delays optimizados
     // ============================================================================
+    // Solo la función startDetection() actualizada:
+
     private fun startDetection() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
             != PackageManager.PERMISSION_GRANTED) {
@@ -344,39 +346,36 @@ class MainActivity : AppCompatActivity() {
         overlayView.clearDetections()
         previewView.removeAllViews()
         
-        // ✅ CRÍTICO: Iniciar cámara de forma suspendible
-        lifecycleScope.launch {
-            try {
-                Log.d(TAG, "🎬 Llamando a initializeCamera()...")
-                cameraManager.initializeCamera()
+        // ✅ IMPORTANTE: Verificar que previewView tenga dimensiones
+        Log.d(TAG, "📐 PreviewView antes de iniciar: ${previewView.width}x${previewView.height}")
+        
+        // ✅ Iniciar cámara directamente (sin corrutinas innecesarias)
+        try {
+            Log.d(TAG, "🎬 Llamando a initializeCamera()...")
+            cameraManager.initializeCamera()
+            
+            // Esperar un frame antes de ocultar banner
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                adManager.onDetectionStarted()
                 
-                // Pequeña espera para asegurar que la cámara inició
-                delay(300)
-                
-                withContext(Dispatchers.Main) {
-                    adManager.onDetectionStarted()
-                    
-                    Toast.makeText(
-                        this@MainActivity, 
-                        TranslationsManager.getDetectionStarted(currentLanguage), 
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
+                Toast.makeText(
+                    this@MainActivity, 
+                    TranslationsManager.getDetectionStarted(currentLanguage), 
+                    Toast.LENGTH_SHORT
+                ).show()
                 
                 Log.i(TAG, "✅ Detección iniciada correctamente")
-                
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ Error iniciando detección: ${e.message}", e)
-                withContext(Dispatchers.Main) {
-                    detecting = false
-                    updateUILanguage()
-                    Toast.makeText(
-                        this@MainActivity, 
-                        "Error: ${e.message}", 
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-            }
+            }, 500)
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error iniciando detección: ${e.message}", e)
+            detecting = false
+            updateUILanguage()
+            Toast.makeText(
+                this@MainActivity, 
+                "Error: ${e.message}", 
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 
@@ -522,16 +521,16 @@ class MainActivity : AppCompatActivity() {
             
             detectionManager.release()
             
-            // ✅ FIX: No llamar a stopCamera() deprecated en onDestroy
-            // La app se está cerrando de todas formas
+            // ✅ NUEVO: Liberar CameraManager correctamente
+            cameraManager.release()
             
             adManager.destroy()
             
             Log.i(TAG, "✅ Recursos liberados correctamente")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error en onDestroy: ${e.message}", e)
-        }
     }
+}
 
     override fun onPause() {
         super.onPause()

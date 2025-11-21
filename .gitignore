@@ -22,3 +22,10 @@ yolov8n_saved_model/variables/variables.data-00000-of-00001
 yolov8n_saved_model/variables/variables.index
 /alert_sound.wav
 /crear_alerta_sonora.py
+logs.txt
+logs.txt
+logs/logs_cortos.txt
+logs/logs.zip
+logs/logs1.txt
+logs/logs2.txt
+logs/logs3.txt
