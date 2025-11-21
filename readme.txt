@@ -29,7 +29,7 @@ El repositorio sigue una arquitectura típica de proyectos Kotlin. Para obtener 
 
 ## Estado del Proyecto
 
-- Privado y en desarrollo activo.
+- Publico y en desarrollo activo.
 - Última actualización: 2025-11-16
 
 ## Licencia
