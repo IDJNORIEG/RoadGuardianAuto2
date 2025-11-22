@@ -1,5 +1,5 @@
 
-**RoadGuardianAuto2** es un proyecto privado de vigilancia o soporte para sistemas de carretera desarrollado principalmente en **Kotlin**.
+**RoadGuardianAuto2** es un proyecto publico de vigilancia o soporte para sistemas de carretera desarrollado principalmente en **Kotlin**.
 
 ## Descripción
 
