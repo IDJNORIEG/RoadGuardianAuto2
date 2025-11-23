@@ -1,4 +1,4 @@
-
+![Captura_deteccion](RoadGuardian.png)
 **RoadGuardianAuto2** es un proyecto publico de vigilancia o soporte para sistemas de carretera desarrollado principalmente en **Kotlin**.
 
 ## Descripción
